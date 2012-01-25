@@ -161,6 +161,7 @@ teaint tea_eval(char* cmd)
                     a *= base;
                     a += b;
                 }
+                cmd--;
                 adjust=1;
                 break;
 
@@ -378,10 +379,10 @@ teaint tea_eval(char* cmd)
                 cmd++;
                 pushback = 0;
                 switch(*cmd) {
-                    case '.': // print top as number ( num -- )
+                    default: // print top as number ( num -- )
                         tea_printf("%u\n", a);
                         break;
-                    default: // print top2 as string ( length ptr -- )
+                    case '.': // print top2 as string ( length ptr -- )
                         cmd--;
                         adjust = -2;
                         tea_printf("%.*s", a, (char*)b);
