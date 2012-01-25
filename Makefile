@@ -1,5 +1,5 @@
 
-CFLAGS+=-Os -DTEST_IT -DUSE_STDOUT
+CFLAGS+=-g -Os -DTEST_IT -DUSE_STDOUT
 
 all: tea-test
 
