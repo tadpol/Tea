@@ -77,7 +77,7 @@ typedef unsigned char teabyte; /*!< a 8 bit number */
  * How big is the stack
  */
 #define tea_stack_depth 10
-#define tea_variable_count 26
+#define tea_variable_count 10
 #define tea_variable_max ((tea_variable_count>26)?26:tea_variable_count)
 
 /**
@@ -158,7 +158,8 @@ teaint tea_eval(char* cmd)
                 cmd--;
                 adjust=1;
         } else
-        if( *cmd >= 'A' && *cmd <= (tea_variable_max-1) ) { // varaible address ( -- ptr )
+        if( *cmd >= 'A' && *cmd <= (tea_variable_max-1) ) {
+            // variable address ( -- ptr )
             a = (teaint)(VP - ( *cmd - 'A' ));
             adjust = 1;
         } else
@@ -369,7 +370,6 @@ teaint tea_eval(char* cmd)
             cmd++;
             pushback = 0;
             if( *cmd == '.' ) { // print top2 as string ( length ptr -- )
-                cmd--;
                 adjust = -2;
                 tea_printf("%.*s", a, (char*)b);
                 /* WARNING the * modifier isn't always implemented
@@ -378,6 +378,7 @@ teaint tea_eval(char* cmd)
             } else
             { // print top as number ( num -- )
                 tea_printf("%u\n", a);
+                cmd--;
             }
         } else
         { // NOP
