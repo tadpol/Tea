@@ -40,7 +40,7 @@
  * - Digits are read in without limit checks.  Numbers will slilently
  *   overflow if you are not checking.
  * - Memory read/writes are not checked for alignment.
- *
+ * - If the stack goes too deep, it will over run the variables.
  *
  *
  *
@@ -127,29 +127,20 @@ teaint tea_eval(char* cmd)
         base = 10;
 
         /* Now do the command */
-        switch( *cmd ) {
-            case '0': // push number ( -- value )
-                if( *(cmd+1) == 'b' ) {
-                    base = 2;
-                    cmd+=2;
-                } else
+        if( *cmd >= '0' && *cmd <= '9' ) {
+            // push number ( -- value )
+            if( *(cmd+1) == 'b' ) {
+                base = 2;
+                cmd+=2;
+            } else
                 if( *(cmd+1) == 'o' ) {
                     base = 8;
                     cmd+=2;
                 } else
-                if( *(cmd+1) == 'x' ) {
-                    base = 16;
-                    cmd+=2;
-                }
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
+                    if( *(cmd+1) == 'x' ) {
+                        base = 16;
+                        cmd+=2;
+                    }
                 a = 0;
                 for(; *cmd != '\0'; cmd++ ) {
                     b = *cmd;
@@ -163,240 +154,228 @@ teaint tea_eval(char* cmd)
                 }
                 cmd--;
                 adjust=1;
-                break;
+        } else
 
-            case 's': // swap ( a b -- b a )
-                c = b;
-                b = a;
-                a = c;
-                adjust = 0;
-                pushback = 2;
-                break;
-            case 'x': // drop ( a -- )
-                pushback = 0;
-                break;
-            case 'v': // dup ( a -- a a )
-                adjust = 1;
-                break;
-            case 'l': // ndup ( n a ... b -- b a ... b )
-                a++; 
-                a = *(SP - a);
-                adjust = 0;
-                break;
-            case 'n': // nswap ( n a ... b -- b ... a )
-                /* top is index into stack, pop, then swap top and nth */
-                a++; // add one because we haven't dropped the index yet.
-                c = *(SP-a);
-                *(SP-a) = b;
-                a = c;
-                break;
+        if( *cmd == 's' ) { // swap ( a b -- b a )
+            c = b;
+            b = a;
+            a = c;
+            adjust = 0;
+            pushback = 2;
+        } else
+        if( *cmd == 'x' ) { // drop ( a -- )
+            pushback = 0;
+        } else
+        if( *cmd == 'v' ) { // dup ( a -- a a )
+            adjust = 1;
+        } else
+        if( *cmd == 'l' ) { // ndup ( n a ... b -- b a ... b )
+            a++;
+            a = *(SP - a);
+            adjust = 0;
+        } else
+        if( *cmd == 'n' ) { // nswap ( n a ... b -- b ... a )
+            /* top is index into stack, pop, then swap top and nth */
+            a++; // add one because we haven't dropped the index yet.
+            c = *(SP-a);
+            *(SP-a) = b;
+            a = c;
+        } else
 
-            case '+': // add ( a b -- b+a )
-                a = b + a;
-                break;
-            case '-': // sub ( a b -- b-a )
-                a = b - a;
-                break;
-            case '*': // multiply ( a b -- b*a )
-                a = b * a;
-                break;
-            case '/': // divide ( a b -- b/a )
-                a = b / a;
-                break;
-            case '%': // modulo ( a b -- b%a )
-                a = b % a;
-                break;
+        if( *cmd == '+' ) { // add ( a b -- b+a )
+            a = b + a;
+        } else
+        if( *cmd == '-' ) { // sub ( a b -- b-a )
+            a = b - a;
+        } else
+        if( *cmd == '*' ) { // multiply ( a b -- b*a )
+            a = b * a;
+        } else
+        if( *cmd == '/' ) { // divide ( a b -- b/a )
+            a = b / a;
+        } else
+        if( *cmd == '%' ) { // modulo ( a b -- b%a )
+            a = b % a;
+        } else
 
-            case '|':// Bit OR ( a b -- b|a )
-                a = b | a;
-                break;
-            case '^': // Bit XOR ( a b -- b^a )
-                a = b ^ a;
-                break;
-            case '&': // Bit AND ( a b -- b&a )
-                a = b & a;
-                break;
-            case '~': // Bit invert ( a -- ~a )
-                a = ~a;
-                adjust = 0;
-                break;
+        if( *cmd == '|' ) {// Bit OR ( a b -- b|a )
+            a = b | a;
+        } else
+        if( *cmd == '^' ) { // Bit XOR ( a b -- b^a )
+            a = b ^ a;
+        } else
+        if( *cmd == '&' ) { // Bit AND ( a b -- b&a )
+            a = b & a;
+        } else
+        if( *cmd == '~' ) { // Bit invert ( a -- ~a )
+            a = ~a;
+            adjust = 0;
+        } else
 
-            case '=': // Test equal to ( a b -- a==b )
-                a = a == b;
-                break;
+        if( *cmd == '=' ) { // Test equal to ( a b -- a==b )
+            a = a == b;
+        } else
 
-            case '>':
-                cmd++;
-                switch(*cmd) {
-                    case '>': // Bit shift right ( a b -- b>>a )
-                        a = b >> a;
-                        break;
-                    case '=': // Test Greater than equalto ( a b -- b>=a )
-                        a = b >= a;
-                        break;
-                    default: // Test Greater than ( a b -- b>a )
-                        a = b > a;
-                        cmd--;
-                        break;
-                }
-                break;
-            case '<':
-                cmd++;
-                switch(*cmd) {
-                    case '<': // Bit shift left ( a b -- b<<a )
-                        a = b << a;
-                        break;
-                    case '=': // Test Less Than equalto ( a b -- b<=a )
-                        a = b <= a;
-                        break;
-                    case '>': // Test not equal to ( a b -- a<>b )
-                        a = a != b;
-                        break;
-                    default: // Test Less Than ( a b -- b<a )
-                        a = b < a;
-                        cmd--;
-                        break;
-                }
-                break;
+        if( *cmd == '>' ) {
+            cmd++;
+            if( *cmd == '>' ) { // Bit shift right ( a b -- b>>a )
+                a = b >> a;
+            } else
+            if( *cmd == '=' ) { // Test Greater than equalto ( a b -- b>=a )
+                a = b >= a;
+            } else
+            { // Test Greater than ( a b -- b>a )
+                a = b > a;
+                cmd--;
+            }
+        } else
+        if( *cmd == '<' ) {
+            cmd++;
+            if( *cmd == '<' ) { // Bit shift left ( a b -- b<<a )
+                a = b << a;
+            } else
+            if( *cmd == '=' ) { // Test Less Than equalto ( a b -- b<=a )
+                a = b <= a;
+            } else
+            if( *cmd == '>' ) { // Test not equal to ( a b -- a<>b )
+                a = a != b;
+            } else
+            { // Test Less Than ( a b -- b<a )
+                a = b < a;
+                cmd--;
+            }
+        } else
 
-            case '@':
-                cmd++;
-                adjust = 0;
-                switch(*cmd) {
-                    case 'c': // Read Byte ( ptr -- value )
-                        a = *((teabyte*)a);
-                        break;
-                    case 's': // Read short ( ptr -- value )
-                        a = *((teashort*)a);
-                        break;
-                    default: // Read word ( ptr -- value )
-                        a = *((teaint*)a);
-                        cmd--;
-                        break;
-                    case 'x': // dump range ( length ptr -- )
-                        adjust = -2;
-                        pushback = 0;
-                        for(; a > 0; a--, b++) {
-                            if( (a%16) == 0 ) tea_printf("\n%08x: ", b);
-                            tea_printf("%02x ", *((teabyte*)b));
-                        }
-                        break;
-                }
-                break;
-
-            case '!':
-                cmd++;
+        if( *cmd == '@' ) {
+            cmd++;
+            adjust = 0;
+            if( *cmd == 'c' ) { // Read Byte ( ptr -- value )
+                a = *((teabyte*)a);
+            } else
+            if( *cmd == 's' ) { // Read short ( ptr -- value )
+                a = *((teashort*)a);
+            } else
+            if( *cmd == 'x' ) { // dump range ( length ptr -- )
                 adjust = -2;
                 pushback = 0;
+                for(; a > 0; a--, b++) {
+                    if( (a%16) == 0 ) tea_printf("\n%08x: ", b);
+                    tea_printf("%02x ", *((teabyte*)b));
+                }
+            } else
+            { // Read word ( ptr -- value )
+                a = *((teaint*)a);
+                cmd--;
+            }
+        } else
+
+        if( *cmd == '!' ) {
+            cmd++;
+            adjust = -2;
+            pushback = 0;
+            if( *cmd == 'c' ) { // Write byte ( value ptr -- )
+                *((teabyte*)b) = a;
+            } else
+            if( *cmd == 's' ) { // Write short ( value ptr -- )
+                *((teashort*)b) = a;
+            } else
+            if( *cmd == '+' ) { // Increment word ( value ptr -- )
+                *((teaint*)b) += a;
+            } else
+            if( *cmd == '-' ) { // Decrement word ( value ptr -- )
+                *((teaint*)b) -= a;
+            } else
+            if( *cmd == '@' ) { // Memcpy ( length src dest -- )
+                memcpy((void*)c, (void*)b, a);
+                adjust = -3;
+            } else
+            if( *cmd == '!' ) { // Memset ( value length dest -- )
+                memset((void*)c, a, b);
+                adjust = -3;
+            } else
+            { // Write word ( value ptr -- )
+                *((teaint*)b) = a;
+                cmd--;
+            }
+        } else
+
+        if( *cmd == '(' ) { // Loop begin ( -- )
+            loop = cmd;
+            adjust = 0;
+            pushback = 0;
+        } else
+        if( *cmd == ')' ) { // Loop end ( test -- )
+            if( loop != 0 && a != 0 )
+                cmd = loop;
+            pushback = 0;
+        } else
+        if( *cmd == ':' ) { // IF end ( -- )
+            adjust = 0;
+            pushback = 0;
+        } else
+        if( *cmd == '?' ) { // IF ( test -- )
+            if( a == 0 ) {
+                // false, skip to :
+                for(; *cmd != ':' && *cmd != '\0'; cmd++)
+                {}
+            }
+            pushback = 0;
+        } else
+
+        if( *cmd == '#' ) { // Eval ( ptr -- )
+            /* Need to adjust stack before calling so evalled sees
+             * the correct stack
+             */
+            SP--;
+            (void)tea_eval((char*)a);
+            adjust = 0;
+            pushback = 0;
+        } else
+        if( *cmd == '`' ) { // Jump ( ptr -- )
+            /* Need to adjust stack before calling so C func sees
+             * the correct stack
+             */
+            SP--;
+            ((void(*)(void))a)();
+            adjust = 0;
+            pushback = 0;
+        } else
+
+        if( *cmd == '{' ) { // push token ( -- length ptr )
+            a = 0; // length
+            b = (teaint)(cmd+1); // ptr
+            c = 0;
+            for(; *cmd != '\0'; cmd++, a++ ) {
                 switch(*cmd) {
-                    case 'c': // Write byte ( value ptr -- )
-                        *((teabyte*)b) = a;
-                        break;
-                    case 's': // Write short ( value ptr -- )
-                        *((teashort*)b) = a;
-                        break;
-                    default: // Write word ( value ptr -- )
-                        *((teaint*)b) = a;
-                        cmd--;
-                        break;
-                    case '+': // Increment word ( value ptr -- )
-                        *((teaint*)b) += a;
-                        break;
-                    case '-': // Decrement word ( value ptr -- )
-                        *((teaint*)b) -= a;
-                        break;
-                    case '@': // Memcpy ( length src dest -- )
-                        memcpy((void*)c, (void*)b, a);
-                        adjust = -3;
-                        break;
-                    case '!': // Memset ( value length dest -- )
-                        memset((void*)c, a, b);
-                        adjust = -3;
-                        break;
+                    case '{': c++; break;
+                    case '}': c--; break;
+                    default: break;
                 }
-                break;
+                if(c==0) break;
+            }
+            a--; // don't count trailing bracket.
+            adjust = 2;
+            pushback = 2;
+        } else
 
-            case '(': // Loop begin ( -- )
-                loop = cmd;
-                adjust = 0;
-                pushback = 0;
-                break;
-            case ')': // Loop end ( test -- )
-                if( loop != 0 && a != 0 )
-                    cmd = loop;
-                pushback = 0;
-                break;
-            case ':': // IF end ( -- )
-                adjust = 0;
-                pushback = 0;
-                break;
-            case '?': // IF ( test -- )
-                if( a == 0 ) {
-                    // false, skip to :
-                    for(; *cmd != ':' && *cmd != '\0'; cmd++)
-                    {}
-                }
-                pushback = 0;
-                break;
-
-            case '#': // Eval ( ptr -- )
-                /* Need to adjust stack before calling so evalled sees
-                 * the correct stack
+        if( *cmd == '.' ) {
+            cmd++;
+            pushback = 0;
+            if( *cmd == '.' ) { // print top2 as string ( length ptr -- )
+                cmd--;
+                adjust = -2;
+                tea_printf("%.*s", a, (char*)b);
+                /* WARNING the * modifier isn't always implemented
+                 * in mini-printf implementations!
                  */
-                SP--;
-                (void)tea_eval((char*)a);
-                adjust = 0;
-                pushback = 0;
-                break;
-            case '`': // Jump ( ptr -- )
-                /* Need to adjust stack before calling so C func sees
-                 * the correct stack
-                 */
-                SP--;
-                ((void(*)(void))a)();
-                adjust = 0;
-                pushback = 0;
-                break;
-
-            case '{': // push token ( -- length ptr )
-                a = 0; // length
-                b = (teaint)(cmd+1); // ptr
-                c = 0;
-                for(; *cmd != '\0'; cmd++, a++ ) {
-                    switch(*cmd) {
-                        case '{': c++; break;
-                        case '}': c--; break;
-                        default: break;
-                    }
-                    if(c==0) break;
-                }
-                a--; // don't count trailing bracket.
-                adjust = 2;
-                pushback = 2;
-                break;
-
-            case '.':
-                cmd++;
-                pushback = 0;
-                switch(*cmd) {
-                    default: // print top as number ( num -- )
-                        tea_printf("%u\n", a);
-                        break;
-                    case '.': // print top2 as string ( length ptr -- )
-                        cmd--;
-                        adjust = -2;
-                        tea_printf("%.*s", a, (char*)b);
-                        /* WARNING the * modifier isn't always implemented
-                         * in mini-printf implementations!
-                         */
-                        break;
-                }
-                break;
-
-            default: // NOP
-                adjust = 0;
-                pushback = 0;
-                break;
+            } else
+            { // print top as number ( num -- )
+                tea_printf("%u\n", a);
+            }
+        } else
+        { // NOP
+            adjust = 0;
+            pushback = 0;
         }
 
         /* Now that the command has been completed, put things back into the
