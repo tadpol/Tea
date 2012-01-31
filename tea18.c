@@ -77,6 +77,8 @@ typedef unsigned char teabyte; /*!< a 8 bit number */
  * How big is the stack
  */
 #define tea_stack_depth 10
+#define tea_variable_count 26
+#define tea_variable_max ((tea_variable_count>26)?26:tea_variable_count)
 
 /**
  * Operate on a command string and return the top of the stack.
@@ -90,8 +92,9 @@ typedef unsigned char teabyte; /*!< a 8 bit number */
  */
 teaint tea_eval(char* cmd)
 {
-    static teaint stack[tea_stack_depth];
+    static teaint stack[tea_stack_depth + tea_variable_max];
     static teaint *SP = stack;
+    static teaint *VP = stack + (tea_stack_depth + tea_variable_max - 1);
 
     /* Try to do as much work in registers instead of always doing pop and
      * push.  All but a few commands work with three or less items from the
@@ -154,6 +157,10 @@ teaint tea_eval(char* cmd)
                 }
                 cmd--;
                 adjust=1;
+        } else
+        if( *cmd >= 'A' && *cmd <= (tea_variable_max-1) ) { // varaible address ( -- ptr )
+            a = (teaint)(VP - ( *cmd - 'A' ));
+            adjust = 1;
         } else
 
         if( *cmd == 's' ) { // swap ( a b -- b a )
