@@ -340,6 +340,7 @@ teaint tea_eval(char* cmd)
             pushback = 0;
         } else
         if( *cmd == '`' ) { // Jump ( ptr -- )
+#if 0
             /* Need to adjust stack before calling so C func sees
              * the correct stack
              */
@@ -347,6 +348,13 @@ teaint tea_eval(char* cmd)
             ((void(*)(void))a)();
             adjust = 0;
             pushback = 0;
+#else
+            /* alt, for calling int foo(int argc, char **argv) style functions.
+             * maybe useful. duno.  saving the idea anyhow.
+             */
+            a = ((int(*)(int,char**))a)(b, (char**)(SP-2));
+            adjust = - (b + 1); /* pop all params and replace one for result */
+#endif
         } else
 
         if( *cmd == '{' ) { // push token ( -- length ptr )
@@ -407,7 +415,7 @@ teaint tea_eval(char* cmd)
 #include <stdio.h>
 int main(int argc, char **argv)
 {
-    teabyte buf[160];
+    char buf[160];
     for(;;) {
         printf("> "); fflush(stdout);
         if(fgets(buf, sizeof(buf), stdin) == NULL) break;
