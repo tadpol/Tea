@@ -73,12 +73,66 @@ typedef unsigned int teaint; /*!< a 32 bit number */
 typedef unsigned short teashort; /*!< a 16 bit number */
 typedef unsigned char teabyte; /*!< a 8 bit number */
 
+//#define USE_DICT
+#ifdef USE_DICT
+teabyte tea_dict_base[2024];
+teabyte *tea_dict_head = tea_dict_base;
+
+teaint tea_dict(const char *t, const char *tm, const char *te)
+{
+    teabyte *p = tea_dict_head;
+    teabyte *pl = p;
+    teashort mark= (te-t)+1;
+
+    if( mark < 2 ) return 0;
+
+    if( *t == '+' ) {
+        /* create */
+        memcpy(p, t, mark);
+        p += (tm-t);
+        *p = '\0';
+        p += (te-tm);
+        *p = '\0';
+
+        *p++ = (mark>>8) & 0xff;
+        *p++ = mark & 0xff;
+
+        tea_dict_head = p;
+        return 0;
+    }
+
+    if( *t == '-' ) {
+        /* Delete */
+        t++;
+    }
+
+    while( p > tea_dict_base ) {
+        pl = p;
+        --p;
+        mark = *p;
+        --p;
+        mark |= (*p) << 8;
+
+        p -= mark;
+
+        if( strncmp(t, (char*)p, te-t) == 0) {
+            if( *(t-1) == '-' ) {
+                /* Delete */
+                memmove(p, pl, (tea_dict_head-pl));
+            } else {
+                /* find defintion */
+                return (teaint)((char*)p + (te-t));
+            }
+        }
+    }
+    return 0;
+}
+#endif
+
 /**
  * How big is the stack
  */
 #define tea_stack_depth 10
-#define tea_variable_count 10
-#define tea_variable_max ((tea_variable_count>26)?26:tea_variable_count)
 
 /**
  * Operate on a command string and return the top of the stack.
@@ -92,9 +146,8 @@ typedef unsigned char teabyte; /*!< a 8 bit number */
  */
 teaint tea_eval(char* cmd)
 {
-    static teaint stack[tea_stack_depth + tea_variable_max];
+    static teaint stack[tea_stack_depth];
     static teaint *SP = stack;
-    static teaint *VP = stack + (tea_stack_depth + tea_variable_max - 1);
 
     /* Try to do as much work in registers instead of always doing pop and
      * push.  All but a few commands work with three or less items from the
@@ -136,32 +189,27 @@ teaint tea_eval(char* cmd)
                 base = 2;
                 cmd+=2;
             } else
-                if( *(cmd+1) == 'o' ) {
-                    base = 8;
-                    cmd+=2;
-                } else
-                    if( *(cmd+1) == 'x' ) {
-                        base = 16;
-                        cmd+=2;
-                    }
-                a = 0;
-                for(; *cmd != '\0'; cmd++ ) {
-                    b = *cmd;
-                    if( b >= '0' && b <= '9' ) b -= '0';
-                    else if( b >= 'a' && b <= 'z') b -= 'a' + 10;
-                    else if( b >= 'A' && b <= 'Z') b -= 'A' + 10;
-                    else break;
-                    if( b >= base ) break;
-                    a *= base;
-                    a += b;
-                }
-                cmd--;
-                adjust=1;
-        } else
-        if( *cmd >= 'A' && *cmd <= (tea_variable_max-1) ) {
-            // variable address ( -- ptr )
-            a = (teaint)(VP - ( *cmd - 'A' ));
-            adjust = 1;
+            if( *(cmd+1) == 'o' ) {
+                base = 8;
+                cmd+=2;
+            } else
+            if( *(cmd+1) == 'x' ) {
+                base = 16;
+                cmd+=2;
+            }
+            a = 0;
+            for(; *cmd != '\0'; cmd++ ) {
+                b = *cmd;
+                if( b >= '0' && b <= '9' ) b -= '0';
+                else if( b >= 'a' && b <= 'z') b -= 'a' + 10;
+                else if( b >= 'A' && b <= 'Z') b -= 'A' + 10;
+                else break;
+                if( b >= base ) break;
+                a *= base;
+                a += b;
+            }
+            cmd--;
+            adjust=1;
         } else
 
         if( *cmd == 's' ) { // swap ( a b -- b a )
@@ -357,6 +405,42 @@ teaint tea_eval(char* cmd)
 #endif
         } else
 
+        /* XXX XXX
+         * Ideas.
+         * - Use "" as a command to load Cstrings.
+         *   The bytes between are copied into a staging buffer and then NUL terminated.
+         *   This is mostly for the C function calling above.
+         *   so: "-s" "-p" "fooo" 3 0x888888 `
+         *   No good ideas on how to jump back to beginning of staging buffer.
+         *
+         * - Use [] for dictionary actions.
+         *   - [text] looks up term text
+         *   - [+text] creates a new term (assumes that there is a token on top of stack.)
+         *   - OR [+text|definition] creates new term.
+         *   - [-text] deletes term.  This memmove()s to reclaim the space.
+         *
+         *   Second form of create is suggested because there is nothing else that is using
+         *   tokens.
+         */
+#ifdef USE_DICT
+        if( *cmd == '[' ) { // Dictionary actions
+            a = (teaint)(cmd+1); // t
+            b = 0; // tm
+            c = 0;
+            for(; *cmd != '\0'; cmd++ ) {
+                switch(*cmd) {
+                    case '[': c++; break;
+                    case ']': c--; break;
+                    case '|': if(b==0) b=(teaint)cmd; break;
+                    default: break;
+                }
+                if(c==0) break;
+            }
+            a = tea_dict((char*)a, (char*)b, cmd-1);
+            adjust = 0;
+            pushback = 0;
+        } else
+#else
         if( *cmd == '{' ) { // push token ( -- length ptr )
             a = 0; // length
             b = (teaint)(cmd+1); // ptr
@@ -373,6 +457,7 @@ teaint tea_eval(char* cmd)
             adjust = 2;
             pushback = 2;
         } else
+#endif
 
         if( *cmd == '.' ) {
             cmd++;
