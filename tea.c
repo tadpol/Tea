@@ -95,7 +95,7 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
         alignPointer(p);
 
         tm++;
-        if( tm > te ) {
+        if( tm < te ) {
             memcpy(p, tm, te-tm);
             p += te-tm;
             *p++ = '\0';
