@@ -69,6 +69,7 @@
 #define tea_printf(...) do{}while(0)
 #endif
 
+//typedef unsigned long teaint; /*!< a 64 bit number */
 typedef unsigned int teaint; /*!< a 32 bit number */
 typedef unsigned short teashort; /*!< a 16 bit number */
 typedef unsigned char teabyte; /*!< a 8 bit number */
@@ -82,22 +83,23 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
 {
     teabyte *p = tea_dict_head;
     teabyte *pl = p;
-    teashort mark= (te-t)+1;
-
-    if( mark < 2 ) return 0;
+    teashort mark;
 
     if( *t == '+' ) {
         /* create */
+        t++;
         memcpy(p, t, tm-t);
-        p+= tm-t;
+        p += tm-t;
         *p++ = '\0';
         for(; ((teaint)p % sizeof(teaint)) != 0; ++p) { /* make definition aligned */
             *p = '\0';
         }
+        tm++;
         memcpy(p, tm, te-tm);
         p += te-tm;
         *p++ = '\0';
 
+        mark = (p - tea_dict_head);
         *p++ = (mark>>8) & 0xff;
         *p++ = mark & 0xff;
 
@@ -454,7 +456,7 @@ teaint tea_eval(char* cmd)
                 }
                 if(c==0) break;
             }
-            a = tea_dict((char*)a, (char*)b, cmd-1);
+            a = tea_dict((char*)a, (char*)b, cmd);
             // TODO current design looses the result of find.
             adjust = 0;
             pushback = 0;
