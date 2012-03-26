@@ -73,7 +73,7 @@ typedef unsigned int teaint; /*!< a 32 bit number */
 typedef unsigned short teashort; /*!< a 16 bit number */
 typedef unsigned char teabyte; /*!< a 8 bit number */
 
-//#define USE_DICT
+#define USE_DICT
 #ifdef USE_DICT
 teabyte tea_dict_base[2024];
 teabyte *tea_dict_head = tea_dict_base;
@@ -88,11 +88,15 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
 
     if( *t == '+' ) {
         /* create */
-        memcpy(p, t, mark);
-        p += (tm-t);
-        *p = '\0';
-        p += (te-tm);
-        *p = '\0';
+        memcpy(p, t, tm-t);
+        p+= tm-t;
+        *p++ = '\0';
+        for(; ((teaint)p % sizeof(teaint)) != 0; ++p) { /* make definition aligned */
+            *p = '\0';
+        }
+        memcpy(p, tm, te-tm);
+        p += te-tm;
+        *p++ = '\0';
 
         *p++ = (mark>>8) & 0xff;
         *p++ = mark & 0xff;
@@ -121,7 +125,8 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
                 memmove(p, pl, (tea_dict_head-pl));
             } else {
                 /* find defintion */
-                return (teaint)((char*)p + (te-t));
+                for(p += te-t; ((teaint)p % sizeof(teaint)) != 0; ++p) {} /* make definition aligned */
+                return (teaint)p;
             }
         }
     }
@@ -133,6 +138,18 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
  * How big is the stack
  */
 #define tea_stack_depth 10
+teaint tea_stack[tea_stack_depth];
+teaint *tea_SP = tea_stack;
+
+/* XXX These need to move out into a header. */
+/**
+ * Push a number onto the stack
+ */
+#define tea_push(t) (*(++tea_SP) = (t))
+/**
+ * Pop a number off of the stack
+ */
+#define tea_pop() (*tea_SP--)
 
 /**
  * Operate on a command string and return the top of the stack.
@@ -146,9 +163,6 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
  */
 teaint tea_eval(char* cmd)
 {
-    static teaint stack[tea_stack_depth];
-    static teaint *SP = stack;
-
     /* Try to do as much work in registers instead of always doing pop and
      * push.  All but a few commands work with three or less items from the
      * stack, so this really cuts down on code size.
@@ -175,9 +189,9 @@ teaint tea_eval(char* cmd)
         /* Fetch the top three of the stack, and set the default adjust and
          * pushback values.
          */
-        a = *SP;
-        b = *(SP-1);
-        c = *(SP-2);
+        a = *tea_SP;
+        b = *(tea_SP-1);
+        c = *(tea_SP-2);
         adjust = -1;
         pushback = 1;
         base = 10;
@@ -212,30 +226,34 @@ teaint tea_eval(char* cmd)
             adjust=1;
         } else
 
-        if( *cmd == 's' ) { // swap ( a b -- b a )
-            c = b;
-            b = a;
-            a = c;
-            adjust = 0;
-            pushback = 2;
+        if( *cmd == 's' ) {
+            if( *(cmd+1) == 'n' ) { // nswap ( n a ... b -- b ... a )
+                cmd++;
+                /* top is index into stack, pop, then swap top and nth */
+                a++; // add one because we haven't dropped the index yet.
+                c = *(tea_SP-a);
+                *(tea_SP-a) = b;
+                a = c;
+            } else { // swap ( a b -- b a )
+                c = b;
+                b = a;
+                a = c;
+                adjust = 0;
+                pushback = 2;
+            }
+        } else
+        if( *cmd == 'v' ) {
+            if( *(cmd+1) == 'n' ) { // ndup ( n a ... b -- b a ... b )
+                cmd++;
+                a++;
+                a = *(tea_SP - a);
+                adjust = 0;
+            } else { // dup ( a -- a a )
+                adjust = 1;
+            }
         } else
         if( *cmd == 'x' ) { // drop ( a -- )
             pushback = 0;
-        } else
-        if( *cmd == 'v' ) { // dup ( a -- a a )
-            adjust = 1;
-        } else
-        if( *cmd == 'l' ) { // ndup ( n a ... b -- b a ... b )
-            a++;
-            a = *(SP - a);
-            adjust = 0;
-        } else
-        if( *cmd == 'n' ) { // nswap ( n a ... b -- b ... a )
-            /* top is index into stack, pop, then swap top and nth */
-            a++; // add one because we haven't dropped the index yet.
-            c = *(SP-a);
-            *(SP-a) = b;
-            a = c;
         } else
 
         if( *cmd == '+' ) { // add ( a b -- b+a )
@@ -382,7 +400,7 @@ teaint tea_eval(char* cmd)
             /* Need to adjust stack before calling so evalled sees
              * the correct stack
              */
-            SP--;
+            tea_SP--;
             (void)tea_eval((char*)a);
             adjust = 0;
             pushback = 0;
@@ -400,7 +418,7 @@ teaint tea_eval(char* cmd)
             /* alt, for calling int foo(int argc, char **argv) style functions.
              * maybe useful. duno.  saving the idea anyhow.
              */
-            a = ((int(*)(int,char**))a)(b, (char**)(SP-2));
+            a = ((int(*)(int,char**))a)(b, (char**)(tea_SP-2));
             adjust = - (b + 1); /* pop all params and replace one for result */
 #endif
         } else
@@ -437,6 +455,7 @@ teaint tea_eval(char* cmd)
                 if(c==0) break;
             }
             a = tea_dict((char*)a, (char*)b, cmd-1);
+            // TODO current design looses the result of find.
             adjust = 0;
             pushback = 0;
         } else
@@ -482,17 +501,17 @@ teaint tea_eval(char* cmd)
         /* Now that the command has been completed, put things back into the
          * stack and adjust it as required.
          */
-        SP += adjust;
+        tea_SP += adjust;
         switch(pushback) {
-            case 3: *(SP-2) = c;
-            case 2: *(SP-1) = b;
-            case 1: *SP = a;
+            case 3: *(tea_SP-2) = c;
+            case 2: *(tea_SP-1) = b;
+            case 1: *tea_SP = a;
             default:
                 break;
         }
     }
 
-    return *SP;
+    return *tea_SP;
 }
 
 
