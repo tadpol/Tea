@@ -69,8 +69,8 @@
 #define tea_printf(...) do{}while(0)
 #endif
 
-//typedef unsigned long teaint; /*!< a 64 bit number */
-typedef unsigned int teaint; /*!< a 32 bit number */
+typedef unsigned long teaint; /*!< a 64 bit number */
+//typedef unsigned int teaint; /*!< a 32 bit number */
 typedef unsigned short teashort; /*!< a 16 bit number */
 typedef unsigned char teabyte; /*!< a 8 bit number */
 
@@ -78,6 +78,7 @@ typedef unsigned char teabyte; /*!< a 8 bit number */
 #ifdef USE_DICT
 teabyte tea_dict_base[2024];
 teabyte *tea_dict_head = tea_dict_base;
+#define alignPointer(p) (p) = ((void*)(((teaint)(p)+sizeof(teaint)-1UL)&~(sizeof(teaint)-1UL)))
 
 teaint tea_dict(const char *t, const char *tm, const char *te)
 {
@@ -91,9 +92,8 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
         memcpy(p, t, tm-t);
         p += tm-t;
         *p++ = '\0';
-        for(; ((teaint)p % sizeof(teaint)) != 0; ++p) { /* make definition aligned */
-            *p = '\0';
-        }
+        alignPointer(p);
+
         tm++;
         memcpy(p, tm, te-tm);
         p += te-tm;
@@ -121,13 +121,14 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
 
         p -= mark;
 
-        if( strncmp(t, (char*)p, te-t) == 0) {
+        if( strncmp(t, (char*)p, te-t) == 0 && *(p+(te-t)) == '\0') {
             if( *(t-1) == '-' ) {
                 /* Delete */
                 memmove(p, pl, (tea_dict_head-pl));
             } else {
                 /* find defintion */
-                for(p += te-t; ((teaint)p % sizeof(teaint)) != 0; ++p) {} /* make definition aligned */
+                p += (te-t)+1;
+                alignPointer(p);
                 return (teaint)p;
             }
         }
