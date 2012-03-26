@@ -40,7 +40,7 @@
  * - Digits are read in without limit checks.  Numbers will slilently
  *   overflow if you are not checking.
  * - Memory read/writes are not checked for alignment.
- * - If the stack goes too deep, it will over run the variables.
+ * - If the stack goes too deep, it runs into unknown land.
  *
  *
  *
@@ -95,9 +95,14 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
         alignPointer(p);
 
         tm++;
-        memcpy(p, tm, te-tm);
-        p += te-tm;
-        *p++ = '\0';
+        if( tm > te ) {
+            memcpy(p, tm, te-tm);
+            p += te-tm;
+            *p++ = '\0';
+        } else {
+            /* if empty definiton, give enough space to use as a variable */
+            p += sizeof(teaint);
+        }
 
         mark = (p - tea_dict_head);
         *p++ = (mark>>8) & 0xff;
@@ -125,6 +130,7 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
             if( *(t-1) == '-' ) {
                 /* Delete */
                 memmove(p, pl, (tea_dict_head-pl));
+                tea_dict_head -= pl-p;
             } else {
                 /* find defintion */
                 p += (te-t)+1;
@@ -336,7 +342,7 @@ teaint tea_eval(char* cmd)
                 adjust = -2;
                 pushback = 0;
                 for(; a > 0; a--, b++) {
-                    if( (a%16) == 0 ) tea_printf("\n%08x: ", b);
+                    if( (a%16) == 0 ) tea_printf("\n%p: ", (void*)b);
                     tea_printf("%02x ", *((teabyte*)b));
                 }
             } else
@@ -409,41 +415,40 @@ teaint tea_eval(char* cmd)
             pushback = 0;
         } else
         if( *cmd == '`' ) { // Jump ( ptr -- )
-#if 0
+#if 1
             /* Need to adjust stack before calling so C func sees
              * the correct stack
              */
-            SP--;
+            tea_SP--;
             ((void(*)(void))a)();
             adjust = 0;
             pushback = 0;
 #else
             /* alt, for calling int foo(int argc, char **argv) style functions.
              * maybe useful. duno.  saving the idea anyhow.
+             * 
+             * Needs something to easily load C-string params into stack (or somewhere.)
+             * - Use "" as a command to load Cstrings.
+             *   The bytes between are copied into a staging buffer and then NUL terminated.
+             *   This is mostly for the C function calling above.
+             *   so: "-s" "-p" "fooo" 3 0x888888 `
+             *   No good ideas on how to jump back to beginning of staging buffer.
              */
             a = ((int(*)(int,char**))a)(b, (char**)(tea_SP-2));
             adjust = - (b + 1); /* pop all params and replace one for result */
 #endif
         } else
 
-        /* XXX XXX
-         * Ideas.
-         * - Use "" as a command to load Cstrings.
-         *   The bytes between are copied into a staging buffer and then NUL terminated.
-         *   This is mostly for the C function calling above.
-         *   so: "-s" "-p" "fooo" 3 0x888888 `
-         *   No good ideas on how to jump back to beginning of staging buffer.
-         *
-         * - Use [] for dictionary actions.
-         *   - [text] looks up term text
-         *   - [+text] creates a new term (assumes that there is a token on top of stack.)
-         *   - OR [+text|definition] creates new term.
-         *   - [-text] deletes term.  This memmove()s to reclaim the space.
-         *
-         *   Second form of create is suggested because there is nothing else that is using
-         *   tokens.
-         */
 #ifdef USE_DICT
+        /* - Use [] for dictionary actions.
+         *   - [text] looks up term text
+         *   - [+text|definition] creates new term.
+         *     - [+text|] creates a term with enough space for use as a variable.
+         *       - create variable: [+A|]
+         *       - set it to 9:  9 [A] !
+         *       - read it: [A] @
+         *   - [-text] deletes term.  This memmove()s to reclaim the space.
+         */
         if( *cmd == '[' ) { // Dictionary actions
             a = (teaint)(cmd+1); // t
             b = 0; // tm
@@ -462,40 +467,13 @@ teaint tea_eval(char* cmd)
             adjust = 0;
             pushback = 0;
         } else
-#else
-        if( *cmd == '{' ) { // push token ( -- length ptr )
-            a = 0; // length
-            b = (teaint)(cmd+1); // ptr
-            c = 0;
-            for(; *cmd != '\0'; cmd++, a++ ) {
-                switch(*cmd) {
-                    case '{': c++; break;
-                    case '}': c--; break;
-                    default: break;
-                }
-                if(c==0) break;
-            }
-            a--; // don't count trailing bracket.
-            adjust = 2;
-            pushback = 2;
-        } else
 #endif
 
         if( *cmd == '.' ) {
-            cmd++;
             pushback = 0;
-            if( *cmd == '.' ) { // print top2 as string ( length ptr -- )
-                adjust = -2;
-                tea_printf("%.*s", a, (char*)b);
-                /* WARNING the * modifier isn't always implemented
-                 * in mini-printf implementations!
-                 */
-            } else
-            { // print top as number ( num -- )
-                tea_printf("%u\n", a);
-                cmd--;
-            }
+            tea_printf("%tu\n", a);
         } else
+
         { // NOP
             adjust = 0;
             pushback = 0;
