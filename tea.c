@@ -371,6 +371,10 @@ teaint tea_eval(char* cmd)
              *   This is mostly for the C function calling above.
              *   so: "-s" "-p" "fooo" 3 0x888888 `
              *   No good ideas on how to jump back to beginning of staging buffer.
+             * - Could overload dict, since it NULs all definitions.
+             *   That is: [+a|-s] [+b|-p] [+c|fooo] [a] [b] [c] 3 0x888888 `
+             *   Though looking at that is reaons enough to not use it.
+             *   Also after wards would need: [-c] [-b] [-a]
              */
             a = ((int(*)(int,char**))a)(b, (char**)(tea_SP-2));
             adjust = - (b + 1); /* pop all params and replace one for result */
@@ -424,10 +428,13 @@ teaint tea_eval(char* cmd)
                 tea_dict_head = p;
             } else { /* Lookup or Delete. */
                 teabyte *pl = p;
-                a = 0;
                 if(*cmd == '-') {
                     a = 1; /* Delete */
                     ++cmd;
+                } else {
+                    a = 0; /* Lookup */
+                    adjust = 1;
+                    pushback = 1;
                 }
                 for(b=0; *cmd != '\0' && *cmd != ']'; ++cmd, ++b) {}
                 cmd -= b;
@@ -443,13 +450,12 @@ teaint tea_eval(char* cmd)
                             /* Delete */
                             memmove(p, pl, (tea_dict_head-pl));
                             tea_dict_head -= pl-p;
+                            break;
                         } else {
                             /* Lookup */
                             p += b+1;
                             alignPointer(p);
                             a = (teaint)p;
-                            adjust = 1;
-                            pushback = 1;
                             break;
                         }
                     }
