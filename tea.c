@@ -397,7 +397,7 @@ teaint tea_eval(char* cmd)
             adjust = 0;
             pushback = 0;
             cmd++;
-            if( *cmd == '+' ) { /* Create */
+            if( *cmd == '+' ) { /* Create  ( -- ) */
                 cmd++;
                 for(mark=0; *cmd != '\0' && *cmd != '|'; ++cmd) {
                     *p++ = *cmd;
@@ -429,10 +429,10 @@ teaint tea_eval(char* cmd)
             } else { /* Lookup or Delete. */
                 teabyte *pl = p;
                 if(*cmd == '-') {
-                    a = 1; /* Delete */
+                    a = 1; /* Delete  ( -- ) */
                     ++cmd;
                 } else {
-                    a = 0; /* Lookup */
+                    a = 0; /* Lookup  ( -- ptr ) */
                     adjust = 1;
                     pushback = 1;
                 }
@@ -464,7 +464,7 @@ teaint tea_eval(char* cmd)
         } else
 #endif
 
-        if( *cmd == '.' ) {
+        if( *cmd == '.' ) { /* Print ( a -- ) */
             pushback = 0;
             tea_printf("%tu\n", a);
         } else
