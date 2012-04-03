@@ -79,70 +79,6 @@ typedef unsigned char teabyte; /*!< a 8 bit number */
 teabyte tea_dict_base[2024];
 teabyte *tea_dict_head = tea_dict_base;
 #define alignPointer(p) (p) = ((void*)(((teaint)(p)+sizeof(teaint)-1UL)&~(sizeof(teaint)-1UL)))
-
-#if 1
-teaint tea_dict(const char *t, const char *tm, const char *te)
-{
-    teabyte *p = tea_dict_head;
-    teabyte *pl = p;
-    teashort mark;
-
-    if( *t == '+' ) {
-        /* create */
-        t++;
-        memcpy(p, t, tm-t);
-        p += tm-t;
-        *p++ = '\0';
-        alignPointer(p);
-
-        tm++;
-        if( tm < te ) {
-            memcpy(p, tm, te-tm);
-            p += te-tm;
-            *p++ = '\0';
-        } else {
-            /* if empty definiton, give enough space to use as a variable */
-            p += sizeof(teaint);
-        }
-
-        mark = (p - tea_dict_head);
-        *p++ = (mark>>8) & 0xff;
-        *p++ = mark & 0xff;
-
-        tea_dict_head = p;
-        return 0;
-    }
-
-    if( *t == '-' ) {
-        /* Delete */
-        t++;
-    }
-
-    while( p > tea_dict_base ) {
-        pl = p;
-        --p;
-        mark = *p;
-        --p;
-        mark |= (*p) << 8;
-
-        p -= mark;
-
-        if( strncmp(t, (char*)p, te-t) == 0 && *(p+(te-t)) == '\0') {
-            if( *(t-1) == '-' ) {
-                /* Delete */
-                memmove(p, pl, (tea_dict_head-pl));
-                tea_dict_head -= pl-p;
-            } else {
-                /* find defintion */
-                p += (te-t)+1;
-                alignPointer(p);
-                return (teaint)p;
-            }
-        }
-    }
-    return 0;
-}
-#endif
 #endif
 
 /**
@@ -451,33 +387,14 @@ teaint tea_eval(char* cmd)
          *       - read it: [A] @
          *   - [-text] deletes term.  This memmove()s to reclaim the space.
          */
-#if 1
-        if( *cmd == '[' ) { // Dictionary actions
-            a = (teaint)(cmd+1); // t
-            b = 0; // tm
-            c = 0;
-            for(; *cmd != '\0'; cmd++ ) {
-                switch(*cmd) {
-                    case '[': c++; break;
-                    case ']': c--; break;
-                    case '|': if(b==0) b=(teaint)cmd; break;
-                    default: break;
-                }
-                if(c==0) break;
-            }
-            a = tea_dict((char*)a, (char*)b, cmd);
-            // TODO current design looses the result of find.
-            adjust = 0;
-            pushback = 0;
-        } else
-#else
         if( *cmd == '[' ) { // Dictionary actions
             teabyte *p = tea_dict_head;
             teashort mark;
             adjust = 0;
             pushback = 0;
             cmd++;
-            if( *cmd == '+' ) { // Create
+            if( *cmd == '+' ) { /* Create */
+                cmd++;
                 for(mark=0; *cmd != '\0' && *cmd != '|'; ++cmd) {
                     *p++ = *cmd;
                 }
@@ -495,24 +412,25 @@ teaint tea_eval(char* cmd)
                             case ']': c--; break;
                             default: break;
                         }
-                        *p++ = *cmd;
                         if(c==0) break;
+                        *p++ = *cmd;
                     }
+                    *p++ ='\0';
                 }
                 mark = (p - tea_dict_head);
                 *p++ = (mark>>8) & 0xff;
                 *p++ = mark & 0xff;
 
                 tea_dict_head = p;
-            } else { // Lookup or delete.
+            } else { /* Lookup or Delete. */
                 teabyte *pl = p;
-                ++cmd;
                 a = 0;
                 if(*cmd == '-') {
-                    a = 1; // delete
+                    a = 1; /* Delete */
                     ++cmd;
                 }
-                //???
+                for(b=0; *cmd != '\0' && *cmd != ']'; ++cmd, ++b) {}
+                cmd -= b;
                 while(p > tea_dict_base) {
                     pl=p;
                     --p; mark = *p;
@@ -520,23 +438,24 @@ teaint tea_eval(char* cmd)
 
                     p -= mark;
 
-                    if( strncmp(cmd, (char*)p, b) && *(p+b) == '\0') {
+                    if( strncmp(cmd, (char*)p, b) == 0 && *(p+b) == '\0') {
                         if(a) {
                             /* Delete */
                             memmove(p, pl, (tea_dict_head-pl));
                             tea_dict_head -= pl-p;
                         } else {
+                            /* Lookup */
                             p += b+1;
                             alignPointer(p);
                             a = (teaint)p;
                             adjust = 1;
                             pushback = 1;
+                            break;
                         }
                     }
                 }
             }
         } else
-#endif
 #endif
 
         if( *cmd == '.' ) {
