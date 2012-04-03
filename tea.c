@@ -80,6 +80,7 @@ teabyte tea_dict_base[2024];
 teabyte *tea_dict_head = tea_dict_base;
 #define alignPointer(p) (p) = ((void*)(((teaint)(p)+sizeof(teaint)-1UL)&~(sizeof(teaint)-1UL)))
 
+#if 1
 teaint tea_dict(const char *t, const char *tm, const char *te)
 {
     teabyte *p = tea_dict_head;
@@ -141,6 +142,7 @@ teaint tea_dict(const char *t, const char *tm, const char *te)
     }
     return 0;
 }
+#endif
 #endif
 
 /**
@@ -441,14 +443,15 @@ teaint tea_eval(char* cmd)
 
 #ifdef USE_DICT
         /* - Use [] for dictionary actions.
-         *   - [text] looks up term text
+         *   - [text] looks up pointer to definition of text
          *   - [+text|definition] creates new term.
          *     - [+text|] creates a term with enough space for use as a variable.
          *       - create variable: [+A|]
-         *       - set it to 9:  9 [A] !
+         *       - set it to 9:  [A] 9 !
          *       - read it: [A] @
          *   - [-text] deletes term.  This memmove()s to reclaim the space.
          */
+#if 1
         if( *cmd == '[' ) { // Dictionary actions
             a = (teaint)(cmd+1); // t
             b = 0; // tm
@@ -467,6 +470,73 @@ teaint tea_eval(char* cmd)
             adjust = 0;
             pushback = 0;
         } else
+#else
+        if( *cmd == '[' ) { // Dictionary actions
+            teabyte *p = tea_dict_head;
+            teashort mark;
+            adjust = 0;
+            pushback = 0;
+            cmd++;
+            if( *cmd == '+' ) { // Create
+                for(mark=0; *cmd != '\0' && *cmd != '|'; ++cmd) {
+                    *p++ = *cmd;
+                }
+                *p++ ='\0';
+                alignPointer(p);
+                ++cmd;
+                if( *cmd == ']' ) {
+                    /* if empty definiton, give enough space to use as a variable */
+                    p += sizeof(teaint);
+                } else {
+                    c = 1;
+                    for(; *cmd != '\0'; cmd++ ) {
+                        switch(*cmd) {
+                            case '[': c++; break;
+                            case ']': c--; break;
+                            default: break;
+                        }
+                        *p++ = *cmd;
+                        if(c==0) break;
+                    }
+                }
+                mark = (p - tea_dict_head);
+                *p++ = (mark>>8) & 0xff;
+                *p++ = mark & 0xff;
+
+                tea_dict_head = p;
+            } else { // Lookup or delete.
+                teabyte *pl = p;
+                ++cmd;
+                a = 0;
+                if(*cmd == '-') {
+                    a = 1; // delete
+                    ++cmd;
+                }
+                //???
+                while(p > tea_dict_base) {
+                    pl=p;
+                    --p; mark = *p;
+                    --p; mark |= (*p) << 8;
+
+                    p -= mark;
+
+                    if( strncmp(cmd, (char*)p, b) && *(p+b) == '\0') {
+                        if(a) {
+                            /* Delete */
+                            memmove(p, pl, (tea_dict_head-pl));
+                            tea_dict_head -= pl-p;
+                        } else {
+                            p += b+1;
+                            alignPointer(p);
+                            a = (teaint)p;
+                            adjust = 1;
+                            pushback = 1;
+                        }
+                    }
+                }
+            }
+        } else
+#endif
 #endif
 
         if( *cmd == '.' ) {
