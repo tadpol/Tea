@@ -11,39 +11,51 @@
  *  - Fixed Return stack
  *  - Fixed vars
  * Gives us the following pointers:
- * - teash_mem_start
- *   fixed
- * - teash_script_end
- *   moving
- * - teash_dict_start
- *   moving
- * - teash_dict_end
- *   fixed
- *   aka bottom of return stack
- * - teash_rs
- *   moving
- * - teash_rs_end
- *   fixed
- * - teash_num_vars
- *   fixed
- * - teash_mem_end
- *   fixed
+ * - teash_mem_start    : fixed
+ * - teash_script_end   : moving
+ * - teash_dict_start   : moving
+ * - teash_dict_end     : fixed
+ * - teash_rsp          : moving
+ * - teash_rs_end       : fixed
+ * - teash_num_vars     : fixed
+ * - teash_mem_end      : fixed
  *
  * Free memory is (teash_dict_start - teash_sript_end)
+ *
+ *
+ * The script space is a series of lines.  Each line is two bytes BigE for
+ * the line number. Some number of bytes for the line code, then a NUL
+ * byte. As many lines as will fit is allowed.  Line numbers should always
+ * be in increasing order.
+ *
+ * The dictionary is a bunch of key-value stings.  Primarily lets you save
+ * strings for later use. 
+ *
+ * Number Variables are 26 variables A-Z. They are raw signed integers
+ * (rather that the ascii version of them).
+ *
+ * I'm possibly thinking of merging the NumberVariables into the
+ * Dictionary.
+ *
+ * The Return Stack area is between dict_end and num_vars.  It is intended
+ * for things like gosub/return and loops.  Not sure if this is atually how
+ * I want to use it, but am keep a spot for it for now.
+ *
  *
  */
 
 #define TEASH_LINE_MAX      80
 #define TEASH_PARAM_MAX     10
 #define TEASH_CMD_DEPTH_MAX 10
+#define TEASH_RS_SIZE       10  /* must be even. */
 
 struct teash_memory_s {
     uint8_t *mem_start;
     uint8_t *script_end;
     uint8_t *dict_start;
     uint8_t *dict_end;
-    uint8_t *RS;
-    uint32_t *vars;
+    uint16_t *RS;
+    int32_t *vars;
     uint8_t *mem_end;
 };
 
@@ -72,6 +84,26 @@ teash_state_t teash_state;
  * \breif How many bytes left for script or dict?
  */
 #define teash_has_free(teash) ((teash)->mem.dict_start - (teash)->mem.script_end)
+
+int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem)
+{
+    if( size <= (sizeof(uint32_t)*26)+(sizeof(uint16_t)*TEASH_RS_SIZE) )
+        return -1;
+
+    if( memory & 0x3 ) /* Start isn't aligned */
+        return -2;
+    if( (memory+size) & 0x3 ) /* End isn't alined */
+        return -3;
+
+    mem->mem_start = memory;
+    mem->script_end = memory;
+    mem->mem_end = memory + size;
+
+    mem->vars = mem->mem_end - sizeof(int32_t)*26;
+    mem->dict_end = mem->vars - sizeof(uint16_t)*TEASH_RS_SIZE;
+    mem->RS = mem->dict_end;
+    mem->dict_start = mem->dict_end;
+}
 
 /*****************************************************************************/
 int teash_clear_script(int argc, char **argv)
