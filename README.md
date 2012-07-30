@@ -1,10 +1,9 @@
-Tea18
-=====
+Teash19
+=======
 
-Mostly just me playing around with tiny language ideas.
+This is a really strange variation that tries to mix some shell and BASIC
+ideas.
 
-This is me *finally* putting things under revision control instead of just making directories
-and appending a number.  Someday I may push in the older variations (if I can find them).
-
-Most of the info is in the c files, go read.
+Not quite sure what I think of it, but still poking at it to see what
+happens.
 
