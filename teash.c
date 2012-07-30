@@ -126,37 +126,64 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash)
     return NULL;
 }
 
-int teash_replace_line(uint16_t ln, char *newline, teash_state_t *teash)
+/**
+ * \breif load a new line into the script space
+ *
+ * This keeps the script space sorted by line number. Inserting and replacing
+ * as needed.
+ */
+int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
 {
     uint8_t *oldline = NULL;
-    int oldlen;
-    int newlen = strlen(newline);
+    uint16_t tln;
+    int oldlen=0;
+    int newlen = strlen(newline) + 3;
 
-
-    oldline = teash_find_line(ln, teash);
-    if(oldline == NULL) {
-        oldline = teash->mem.script_end;
-        oldlen = 0;
-    } else {
-        oldlen = strlen(oldline);
+    /* set oldline to where we want to insert. */
+    for(oldline = teash->mem.mem_start;
+        oldline < teash->mem.script_end; ) {
+        tln  = (*oldline++) << 8;
+        tln |= *oldline++;
+        if( tln < ln ) {
+            /* inserting a new line */
+            oldlen = 0;
+            break;
+        } else if( tln == ln ) {
+            /* replacing an old line */
+            oldlen = strlen(oldline) + 3;
+            break;
+        }
+        /* else keep looking */
+        oldline += strlen(oldline) + 1;
     }
+    if( oldline >= teash->mem.script_end ) {
+        /* at the end, so just append. */
+        oldline = teash->mem.script_end;
+        if( teash_has_free(teash) < newlen) 
+            return -2;
+        teash->mem.script_end += newlen;
+    } else if( oldlen < newlen ) {
+        /* growing */
+        if( teash_has_free(teash) < newlen-oldlen) 
+            return -2;
 
-    if( oldlen == newlen ) {}
+        memmove(oldline+newlen, oldline+oldlen, teash->mem.script_end - oldline+oldlen);
 
-}
+        teash->mem.script_end += newlen-oldlen; /* grew by this much */
+    } else if( oldlen > newlen ) {
+        /* shrinking */
+        memmove(oldline+newlen, oldline+oldlen, teash->mem.script_end - oldline+oldlen);
 
-int teash_load_line(int ln, char *p, teash_state_t *teash)
-{
-    int len = strlen(p) + 3;
-    uint8_t *scr;
+        teash->mem.script_end -= oldlen-newlen; /*shrunk by this much */
+    }
+    /* its the right size! */
 
-    if( teash_has_free(teash) < len )
-        return -2;
-
-    scr = teash->mem.script_end;
-    *scr++ = (ln >> 8)&0xff;
-    *scr++ = ln & 0xff;
-    strcpy(scr, p);
+    /* now we can copy it in (unless there is nothing to copy) */
+    if( newlen > 3 ) {
+        *oldline++ = (ln >> 8)&0xff;
+        *oldline++ = ln & 0xff;
+        strcpy(oldline, newline);
+    }
 
     return 0;
 }
