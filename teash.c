@@ -29,18 +29,26 @@
  * be in increasing order.
  *
  * The dictionary is a bunch of key-value stings.  Primarily lets you save
- * strings for later use. 
+ * strings for later use.
  *
  * Number Variables are 26 variables A-Z. They are raw signed integers
  * (rather that the ascii version of them).
  *
  * I'm possibly thinking of merging the NumberVariables into the
- * Dictionary.
+ * Dictionary. Leaving this and the dictionary out until other parts are
+ * debuged.
  *
  * The Return Stack area is between dict_end and num_vars.  It is intended
  * for things like gosub/return and loops.  Not sure if this is atually how
- * I want to use it, but am keep a spot for it for now.
+ * I want to use it, but am keeping a spot for it for now.
  *
+ *
+ *
+ * Also thinking to move 'line' from teash_mloop() and 'argv' from
+ * teash_eval() into this memory block.  This would make the eval not
+ * nestable; which is in line with the BASIC design.  Making this move
+ * would get those two out of the C stack and in with all the other large
+ * memory chunks that teash wants.
  *
  */
 
@@ -90,19 +98,21 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
     if( size <= (sizeof(uint32_t)*26)+(sizeof(uint16_t)*TEASH_RS_SIZE) )
         return -1;
 
-    if( memory & 0x3 ) /* Start isn't aligned */
+    if( (uint32_t)memory & 0x3UL ) /* Start isn't aligned */
         return -2;
-    if( (memory+size) & 0x3 ) /* End isn't alined */
+    if( (uint32_t)(memory+size) & 0x3UL ) /* End isn't alined */
         return -3;
 
     mem->mem_start = memory;
     mem->script_end = memory;
     mem->mem_end = memory + size;
 
-    mem->vars = mem->mem_end - sizeof(int32_t)*26;
-    mem->dict_end = mem->vars - sizeof(uint16_t)*TEASH_RS_SIZE;
-    mem->RS = mem->dict_end;
+    mem->vars = (int32_t*)(mem->mem_end - sizeof(int32_t)*26);
+    mem->dict_end = mem->mem_end - (sizeof(int32_t)*26+sizeof(uint16_t)*TEASH_RS_SIZE);
+    mem->RS = (uint16_t*)mem->dict_end;
     mem->dict_start = mem->dict_end;
+
+    return 0;
 }
 
 /*****************************************************************************/
@@ -161,6 +171,13 @@ teash_cmd_t teash_root_commands[] = {
 
 /*****************************************************************************/
 
+/**
+ * \brief Find a line (or the next one if not exact)
+ *
+ * Finds a line or the next following.  If looking for line 22, but only
+ * lines 20 and 25 exist, will return line 25.
+ *
+ */
 char* teash_find_line(uint16_t ln, teash_state_t *teash)
 {
     uint8_t *p = teash->mem.mem_start;
@@ -444,13 +461,13 @@ int teash_do_line(char *line, teash_state_t *teash)
 
 int teash_mloop(teash_state_t *teash)
 {
-    char line[TEASH_LINE_MAX+1];
+    char line[TEASH_LINE_MAX+1]; // could move into state.
 
     while(1) {
         if( teash->LP == NULL ) {
             printf("> ");
             fflush(stdout);
-            fgets(line, sizeof(line), stdin);
+            if(!fgets(line, sizeof(line), stdin)) break;
             teash_do_line(line, teash);
         } else {
             strncpy(line, teash->LP, TEASH_LINE_MAX);
