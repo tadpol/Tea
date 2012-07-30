@@ -91,13 +91,36 @@ int teash_run_script(int argc, char **argv)
     return 0;
 }
 
+char* teash_find_line(uint16_t ln, teash_state_t *teash); // TODO put prototypes somewhere.
+/**
+ * \brief jump to specific line
+ *
+ * This jumps to the next equal-or-greater line. (or to the end.)
+ *
+ * FE: if the script only has lines 10 and 20, and sees a "goto 15", it will
+ * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
+ * the end of the script.)
+ *
+ */
+int teash_goto_line(int argc, char **argv)
+{
+    uint16_t tln;
+    int ln;
+
+    if( argc != 1 ) return -1;
+
+    ln = strtoul(argv[0], NULL, 0); // TODO so is argv[0] the script or the first param?
+    teash_state.LP = teash_find_line(ln, &teash_state);
+    return 0;
+}
+
 /*****************************************************************************/
 teash_cmd_t teash_root_commands[] = {
-#if 0
     { "clear", teash_clear_script, NULL },
     { "run", teash_run_script, NULL },
-    { "let", teash_let, NULL },
     { "goto", teash_goto_line, NULL },
+#if 0
+    { "let", teash_let, NULL },
     { "if", teash_if, NULL },
 #endif
 
@@ -116,7 +139,7 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash)
         tln <<=8;
         tln |= *p++;
 
-        if( tln == ln )
+        if( tln >= ln )
             return p;
 
         tln = strlen(p) + 1;
@@ -144,13 +167,15 @@ int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
         oldline < teash->mem.script_end; ) {
         tln  = (*oldline++) << 8;
         tln |= *oldline++;
-        if( tln < ln ) {
+        if( tln > ln ) { /* broken. */
             /* inserting a new line */
             oldlen = 0;
+            oldline -= 2;
             break;
         } else if( tln == ln ) {
             /* replacing an old line */
             oldlen = strlen(oldline) + 3;
+            oldline -= 2;
             break;
         }
         /* else keep looking */
