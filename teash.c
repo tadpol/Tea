@@ -151,8 +151,53 @@ int teash_goto_line(int argc, char **argv)
 
     if( argc != 1 ) return -1;
 
-    ln = strtoul(argv[0], NULL, 0); // TODO so is argv[0] the script or the first param?
+    ln = strtoul(argv[1], NULL, 0);
     teash_state.LP = teash_find_line(ln, &teash_state);
+    return 0;
+}
+
+int teash_let(int argc, char **argv)
+{
+
+    // do math
+    // return result
+}
+
+/**
+ * \brief if test is not zero, then exec rest of line
+ *
+ * if "A > B" goto 16
+ * if A>B goto 16
+ *
+ *
+ */
+int teash_if(int argc, char **argv)
+{
+    int ret=0;
+    if( argc < 3 ) return -1;
+
+    ret = teash_let(1, &argv[1]);
+
+    if( ret == 0 ) return 0;
+
+    return teash_exec(argc-2, argv+2, &teash_state);
+}
+
+/**
+ * \brief Skip the next line if not zero
+ */
+int teash_skip(int argc, char **argv)
+{
+    if( argv < 2 ) return -1;
+    argv[0] = "let";
+    if( teash_let(argc, argv) == 0 ) return 0;
+
+    if( teash_state.LP == NULL ) return 0;
+
+    teash_state.LP += strlen(teash_state.LP) + 3;
+    if( teash_state.LP >= (char*)teash_state.mem.script_end)
+        teash_state.LP == NULL;
+
     return 0;
 }
 
@@ -161,10 +206,9 @@ teash_cmd_t teash_root_commands[] = {
     { "clear", teash_clear_script, NULL },
     { "run", teash_run_script, NULL },
     { "goto", teash_goto_line, NULL },
-#if 0
     { "let", teash_let, NULL },
     { "if", teash_if, NULL },
-#endif
+    { "skip", teash_skip, NULL },
 
     { NULL, NULL, NULL }
 };
@@ -273,6 +317,10 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
     teash_cmd_t *parents[TEASH_CMD_DEPTH_MAX];
     teash_cmd_t *current = teash->root;
 
+    /* FIXME or verify: params passed must include command name as argv[0].
+     * For nested commands, only the right most is passed in.
+     * So for a cmd "spi flash dump 256 32" argv[0] is "dump"
+     */
     for(; current->name != NULL; current++) {
         if( strcmp(current->name, argv[ac]) == 0) {
             /* Matched name. */
