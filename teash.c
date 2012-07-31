@@ -156,11 +156,145 @@ int teash_goto_line(int argc, char **argv)
     return 0;
 }
 
+
+int teash_let_expr1(char **p);
+int teash_let_expr4(char **p)
+{
+    int base = 10;
+    int a, b;
+    if( **p >= '0' && **p <= '9' ) {
+        if( **p == '0' ) {
+            (*p)++;
+            if( **p == 'x' ) base = 16;
+            else if( **p == 'o' ) base = 8;
+            else if( **p == 'b' ) base = 2;
+            (*p)++;
+        }
+        a = 0;
+
+        for(; **p != '\0'; (*p)++ ) {
+            b = **p;
+            if( b >= '0' && b <= '9' ) b -= '0';
+            else if( b >= 'a' && b <= 'z' ) b -= 'a' + 10;
+            else if( b >= 'A' && b <= 'Z' ) b -= 'A' + 10;
+            else break;
+            if( b >= base ) break;
+            a *= base;
+            a += b;
+        }
+
+        return a;
+    }
+    if( **p >= 'A' && **p <= 'Z' ) {
+        a = teash_state.mem.vars[ 'A' - (**p) ];
+        (*p)++;
+        return a;
+    }
+    if( **p == '@' ) {
+        (*p)++;
+        if( **p == 'c' ) {
+            (*p)++;
+            a = teash_let_expr4(p);
+            a = *((char*)a);
+        } else {
+            a = teash_let_expr4(p);
+            a &= ~0x3; /* Force alignment */
+            a = *((int*)a);
+        }
+        return a;
+    }
+    if( **p == '(' ) {
+        (*p)++;
+        a = teash_let_expr1(p);
+        if( **p == ')' ) {
+            (*p)++;
+        }
+        return a;
+    }
+    return 0;
+}
+int teash_let_expr3(char **p)
+{
+    int a,b;
+    a = teash_let_expr4(p);
+    while(1) {
+        if( **p == '*' ) {
+            (*p)++;
+            b = teash_let_expr4(p);
+            a *= b;
+        } else if( **p == '/' ) {
+            (*p)++;
+            b = teash_let_expr4(p);
+            if(b==0) return 0;
+            a /= b;
+        } else {
+            return a;
+        }
+    }
+}
+int teash_let_expr2(char **p)
+{
+    int a,b;
+    if( **p == '-' || **p == '+' )
+        a = 0;
+    else
+        a = teash_let_expr3(p);
+    while(1) {
+        if( **p == '-' ) {
+            (*p)++;
+            b = teash_let_expr3(p);
+            a -= b;
+        } else if( **p == '+' ) {
+            (*p)++;
+            b = teash_let_expr3(p);
+            a += b;
+        } else {
+            return a;
+        }
+    }
+}
+int teash_let_expr1(char **p)
+{
+    int a,b;
+
+    a = teash_let_expr2(p);
+        if( **p == '>' ) {
+            (*p)++;
+            if( **p == '=' ) {
+                (*p)++;
+                b = teash_let_expr2(p);
+            } else {
+            }
+        }
+    return a;
+}
 int teash_let(int argc, char **argv)
 {
+    char *p;
+    int a;
+    int setidx = -1;
 
-    // do math
-    // return result
+    /* drop "let" */
+    argc--, argv++;
+    
+    /* process exressions */
+    for(; argc > 0; argc--, argv++) {
+        p = *argv;
+
+        /* best way to do a set? no */
+        if( *p >= 'A' && *p <= 'Z' && *(p+1) == '=' ) {
+            setidx = 'A' - *p;
+            p+=2;
+        }
+
+        a = teash_let_expr1(&p);
+
+        if( setidx > -1 ) {
+            teash_state.mem.vars[setidx] = a;
+        }
+    }
+
+    return a;
 }
 
 /**
@@ -176,7 +310,8 @@ int teash_if(int argc, char **argv)
     int ret=0;
     if( argc < 3 ) return -1;
 
-    ret = teash_let(1, &argv[1]);
+    argv[0] = "let";
+    ret = teash_let(2, argv);
 
     if( ret == 0 ) return 0;
 
@@ -188,7 +323,7 @@ int teash_if(int argc, char **argv)
  */
 int teash_skip(int argc, char **argv)
 {
-    if( argv < 2 ) return -1;
+    if( argc < 2 ) return -1;
     argv[0] = "let";
     if( teash_let(argc, argv) == 0 ) return 0;
 
@@ -535,3 +670,16 @@ int teash_mloop(teash_state_t *teash)
     return 0;
 }
 
+
+#ifdef TEST_IT
+uint8_t test_memory[4096];
+
+int main(int argc, char **argv)
+{
+    teash_init_memory(test_memory, sizeof(test_memory), &teash_state.mem);
+
+    return teash_mloop(&teash_state);
+}
+#endif
+
+/* vim: set ai cin et sw=4 ts=4 : */
