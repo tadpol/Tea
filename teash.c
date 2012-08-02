@@ -123,7 +123,7 @@ int teash_clear_script(int argc, char **argv, teash_state_t *teash)
     return 0;
 }
 
-int teash_run_script(int argc, char **argv)
+int teash_run_script(int argc, char **argv, teash_state_t *teash)
 {
     if( teash->LP != NULL ) return -1; /* already running */
 
@@ -319,7 +319,7 @@ int teash_if(int argc, char **argv, teash_state_t *teash)
     if( argc < 3 ) return -1;
 
     argv[0] = "let";
-    ret = teash_let(2, argv);
+    ret = teash_let(2, argv, teash);
 
     if( ret == 0 ) return 0;
 
@@ -333,7 +333,7 @@ int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
     if( argc < 2 ) return -1;
     argv[0] = "let";
-    if( teash_let(argc, argv) == 0 ) return 0;
+    if( teash_let(argc, argv, teash) == 0 ) return 0;
 
     if( teash->LP == NULL ) return 0;
 
