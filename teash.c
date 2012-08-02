@@ -67,7 +67,8 @@ struct teash_memory_s {
     uint8_t *mem_end;
 };
 
-typedef int(*teash_f)(int,char**);
+typedef struct teash_state_s teash_state_t;
+typedef int(*teash_f)(int,char**,teash_state_t*);
 
 typedef struct teash_cmd_s teash_cmd_t;
 struct teash_cmd_s {
@@ -83,7 +84,6 @@ struct teash_state_s {
 
     char *LP;
 };
-typedef struct teash_state_s teash_state_t;
 
 
 teash_state_t teash_state;
@@ -116,19 +116,19 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
 }
 
 /*****************************************************************************/
-int teash_clear_script(int argc, char **argv)
+int teash_clear_script(int argc, char **argv, teash_state_t *teash)
 {
     /* where is teash_state_t??? Assuming single global for now. */
-    teash_state.mem.script_end = teash_state.mem.mem_start;
+    teash->mem.script_end = teash->mem.mem_start;
     return 0;
 }
 
 int teash_run_script(int argc, char **argv)
 {
-    if( teash_state.LP != NULL ) return -1; /* already running */
+    if( teash->LP != NULL ) return -1; /* already running */
 
     /* first line is three bytes in. */
-    teash_state.LP = teash_state.mem.mem_start + 2;
+    teash->LP = teash->mem.mem_start + 2;
 
     return 0;
 }
@@ -144,7 +144,7 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash); // TODO put prototypes
  * the end of the script.)
  *
  */
-int teash_goto_line(int argc, char **argv)
+int teash_goto_line(int argc, char **argv, teash_state_t *teash)
 {
     uint16_t tln;
     int ln;
@@ -152,11 +152,15 @@ int teash_goto_line(int argc, char **argv)
     if( argc != 1 ) return -1;
 
     ln = strtoul(argv[1], NULL, 0);
-    teash_state.LP = teash_find_line(ln, &teash_state);
+    teash->LP = teash_find_line(ln, teash);
     return 0;
 }
 
 
+/****************************************************************************/
+/* This implementation of let is broken.
+ * It cannot handle spanning strings, and it needs to.
+ */
 int teash_let_expr1(char **p);
 int teash_let_expr4(char **p)
 {
@@ -268,7 +272,10 @@ int teash_let_expr1(char **p)
         }
     return a;
 }
-int teash_let(int argc, char **argv)
+/* This implementation of let is broken.
+ * It cannot handle spanning strings, and it needs to.
+ */
+int teash_let(int argc, char **argv, teash_state_t *teash)
 {
     char *p;
     int a;
@@ -290,12 +297,13 @@ int teash_let(int argc, char **argv)
         a = teash_let_expr1(&p);
 
         if( setidx > -1 ) {
-            teash_state.mem.vars[setidx] = a;
+            teash->mem.vars[setidx] = a;
         }
     }
 
     return a;
 }
+/****************************************************************************/
 
 /**
  * \brief if test is not zero, then exec rest of line
@@ -305,7 +313,7 @@ int teash_let(int argc, char **argv)
  *
  *
  */
-int teash_if(int argc, char **argv)
+int teash_if(int argc, char **argv, teash_state_t *teash)
 {
     int ret=0;
     if( argc < 3 ) return -1;
@@ -315,23 +323,24 @@ int teash_if(int argc, char **argv)
 
     if( ret == 0 ) return 0;
 
-    return teash_exec(argc-2, argv+2, &teash_state);
+    return teash_exec(argc-2, argv+2, teash);
 }
 
 /**
  * \brief Skip the next line if not zero
  */
-int teash_skip(int argc, char **argv)
+int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
     if( argc < 2 ) return -1;
     argv[0] = "let";
     if( teash_let(argc, argv) == 0 ) return 0;
 
-    if( teash_state.LP == NULL ) return 0;
+    if( teash->LP == NULL ) return 0;
 
-    teash_state.LP += strlen(teash_state.LP) + 3;
-    if( teash_state.LP >= (char*)teash_state.mem.script_end)
-        teash_state.LP == NULL;
+    /* Find next line */
+    teash->LP += strlen(teash->LP) + 3;
+    if( teash->LP >= (char*)teash->mem.script_end)
+        teash->LP == NULL;
 
     return 0;
 }
@@ -462,7 +471,7 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
             if( current->sub == NULL || (argc-ac) == 1) {
                 /* Cannot go deeper, try to call */
                 if( current->cmd ) {
-                    return current->cmd((argc-ac), &argv[ac]);
+                    return current->cmd((argc-ac), &argv[ac], teash);
                 }
                 break;
             } else {
@@ -480,7 +489,7 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
      */
     for(ac--; ac > 0; ac--) {
         if( parents[ac]->cmd ) {
-            return parents[ac]->cmd((argc-ac), &argv[ac]);
+            return parents[ac]->cmd((argc-ac), &argv[ac], teash);
         }
     }
 
@@ -518,6 +527,7 @@ char* teash_itoa(int i, char *b, unsigned max)
 /**
  * \brief Find the $vars and replace them
  *
+ * FIXME work in place.
  */
 int teash_subst(char *in, char *out, teash_state_t *teash)
 {
