@@ -486,6 +486,15 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
 
     /* No command to call at deepest find, backtrack up to see if we missed
      * one.
+     *
+     * This is to handle the following:
+     * - Have tree with commands defined at the following points:
+     *   A
+     *   A B
+     *   A B C D
+     * - The command "A B C" is executed.
+     * - So a depth search we find node C, but there are no commands there,
+     *   so we need to backtrack to B.
      */
     for(ac--; ac > 0; ac--) {
         if( parents[ac]->cmd ) {
