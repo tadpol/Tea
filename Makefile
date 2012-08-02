@@ -1,8 +1,8 @@
 
-#CFLAGS+=-g -Os -DTEST_IT -DUSE_STDOUT
-CFLAGS+= -Os -DTEST_IT
+CFLAGS+=-g -DTEST_IT
+#CFLAGS+= -Os -DTEST_IT
 
-all: teash.o
+all: teash
 
 teash: teash.o
 	$(CC) $(CFLAGS) -o $@ $^

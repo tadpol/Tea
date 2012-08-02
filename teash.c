@@ -85,7 +85,6 @@ struct teash_state_s {
     char *LP;
 };
 
-
 teash_state_t teash_state;
 
 /**
@@ -158,6 +157,7 @@ int teash_goto_line(int argc, char **argv, teash_state_t *teash)
 
 
 /****************************************************************************/
+#if 0
 /* This implementation of let is broken.
  * It cannot handle spanning strings, and it needs to.
  */
@@ -302,6 +302,22 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
     }
 
     return a;
+}
+#endif
+int teash_let(int argc, char **argv, teash_state_t *teash)
+{
+    char *p;
+    int es=0;
+    /* drop "let" */
+    argc--, argv++;
+    
+    /* process exressions */
+    for(; argc > 0; argc--, argv++) {
+        p = *argv;
+
+    }
+
+    return 0;
 }
 /****************************************************************************/
 
@@ -520,7 +536,7 @@ char* teash_itoa(int i, char *b, unsigned max)
 
     /* ascii-fy (backwards.) */
     do {
-        *t = '0' - (i%10);
+        *t = (i%10) - '0';
         i /= 10;
     }while(i>0);
 
@@ -581,6 +597,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
         }
     }
 
+    *out = '\0';
     return 0;
 }
 
@@ -630,7 +647,7 @@ int teash_eval(char *line, teash_state_t *teash)
             /* find end */
             for(; !isspace(*p) && *p != '\0'; p++) {}
         }
-        *p++ = '\0';
+        *p = '\0';
     }
 
     return teash_exec(argc, argv, teash);
@@ -653,9 +670,10 @@ int teash_do_line(char *line, teash_state_t *teash)
     /* is first work a number? */
     for(; isdigit(*p) && *p != '\0'; p++) {
         ln *= 10;
-        ln += '0' - *p;
+        ln += *p - '0';
     }
     if( isspace(*p) ) {
+        for(; isspace(*p) && *p != '\0'; p++) {}
         return teash_load_line(ln, p, teash);
     }
     return teash_eval(line, teash);
@@ -678,7 +696,7 @@ int teash_mloop(teash_state_t *teash)
             /* Set up LP for the next line after this one */
             teash->LP += strlen(teash->LP) + 3;
             if( teash->LP >= (char*)teash->mem.script_end)
-                teash->LP == NULL;
+                teash->LP = NULL;
 
             /* eval this line */
             teash_eval(line, teash);
@@ -696,6 +714,7 @@ uint8_t test_memory[4096];
 int main(int argc, char **argv)
 {
     teash_init_memory(test_memory, sizeof(test_memory), &teash_state.mem);
+    teash_state.root = teash_root_commands;
 
     return teash_mloop(&teash_state);
 }
