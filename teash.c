@@ -370,6 +370,8 @@ teash_cmd_t teash_root_commands[] = {
     { "if", teash_if, NULL },
     { "skip", teash_skip, NULL },
 
+    /* TODO add LIST command to see what is in the script space. */
+
     { NULL, NULL, NULL }
 };
 
@@ -420,7 +422,7 @@ int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
         oldline < teash->mem.script_end; ) {
         tln  = (*oldline++) << 8;
         tln |= *oldline++;
-        if( tln > ln ) { /* broken. */
+        if( tln > ln ) { /* XXX Test this. */
             /* inserting a new line */
             oldlen = 0;
             oldline -= 2;
@@ -480,6 +482,8 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
     /* FIXME or verify: params passed must include command name as argv[0].
      * For nested commands, only the right most is passed in.
      * So for a cmd "spi flash dump 256 32" argv[0] is "dump"
+     *
+     * XXX Test nested commands.
      */
     for(; current->name != NULL; current++) {
         if( strcmp(current->name, argv[ac]) == 0) {
@@ -625,7 +629,7 @@ int teash_eval(char *line, teash_state_t *teash)
         for(; isspace(*p) && *p != '\0'; p++) {}
         if( *p == '\0' ) break;
 
-        if( *p == '"' ) {
+        if( *p == '"' ) { /* XXX Test this */
             p++; /* skip over the quote */
             argv[argc++] = p;
             for(; *p != '"' && *p != '\0'; p++) {
