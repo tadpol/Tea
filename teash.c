@@ -141,15 +141,13 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash); // TODO put prototypes
  * FE: if the script only has lines 10 and 20, and sees a "goto 15", it will
  * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
  * the end of the script.)
- *
- * TODO Test this
  */
 int teash_goto_line(int argc, char **argv, teash_state_t *teash)
 {
     uint16_t tln;
     int ln;
 
-    if( argc != 1 ) return -1;
+    if( argc != 2 ) return -1;
 
     ln = strtoul(argv[1], NULL, 0);
     teash->LP = teash_find_line(ln, teash);
