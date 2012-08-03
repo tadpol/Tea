@@ -361,6 +361,23 @@ int teash_skip(int argc, char **argv, teash_state_t *teash)
     return 0;
 }
 
+/**
+ * \brief List what is in the script space.
+ */
+int teash_list(int argc, char **argv, teash_state_t *teash)
+{
+    uint8_t *p;
+    uint16_t ln;
+    for(p = teash->mem.mem_start; p < teash->mem.script_end; ) {
+        ln = *p++;
+        ln <<= 8;
+        ln |= *p++;
+        printf("%5u %s\n", ln, p);
+        p += strlen(p) + 1;
+    }
+    return 0;
+}
+
 /*****************************************************************************/
 teash_cmd_t teash_root_commands[] = {
     { "clear", teash_clear_script, NULL },
@@ -369,8 +386,7 @@ teash_cmd_t teash_root_commands[] = {
     { "let", teash_let, NULL },
     { "if", teash_if, NULL },
     { "skip", teash_skip, NULL },
-
-    /* TODO add LIST command to see what is in the script space. */
+    { "list", teash_list, NULL },
 
     { NULL, NULL, NULL }
 };
@@ -664,15 +680,20 @@ int teash_eval(char *line, teash_state_t *teash)
  */
 int teash_do_line(char *line, teash_state_t *teash)
 {
-    char *p = line;
-    int ln = 0;
+    char *p;
+    int ln;
+
+    /* trim whitespace on tail */
+    for(p=line; *p != '\0'; p++) {} /* goto end */
+    for(p--; isspace(*p); p--) {} /* back up over whitespaces */
+    *(++p) = '\0'; /* end the line */
 
     /* skip whitespace */
-    for(; isspace(*p) && *p != '\0'; p++) {}
+    for(p=line; isspace(*p) && *p != '\0'; p++) {}
     if( *p == '\0' ) return 0;
 
     /* is first work a number? */
-    for(; isdigit(*p) && *p != '\0'; p++) {
+    for(ln=0; isdigit(*p) && *p != '\0'; p++) {
         ln *= 10;
         ln += *p - '0';
     }
