@@ -651,7 +651,7 @@ int teash_eval(char *line, teash_state_t *teash)
         for(; isspace(*p) && *p != '\0'; p++) {}
         if( *p == '\0' ) break;
 
-        if( *p == '"' ) { /* XXX Test this */
+        if( *p == '"' ) {
             p++; /* skip over the quote */
             argv[argc++] = p;
             for(; *p != '"' && *p != '\0'; p++) {
@@ -661,7 +661,7 @@ int teash_eval(char *line, teash_state_t *teash)
                          * But once we have it, we don't need to get it
                          * again.
                          */
-                        for(end=buf; *end != '\0'; end++) {}
+                        for(end=p; *end != '\0'; end++) {}
                     }
                     /* slide all on down */
                     memmove(p, p+1, end-p);
