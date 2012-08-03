@@ -381,6 +381,16 @@ int teash_list(int argc, char **argv, teash_state_t *teash)
     return 0;
 }
 
+int teash_puts(int argc, char **argv, teash_state_t *teash)
+{
+    argc--, argv++;
+    for(; argc > 0; argc--, argv++) {
+        printf("%s", *argv);
+    }
+    printf("\n");
+    return 0;
+}
+
 /*****************************************************************************/
 teash_cmd_t teash_root_commands[] = {
     { "clear", teash_clear_script, NULL },
@@ -390,6 +400,7 @@ teash_cmd_t teash_root_commands[] = {
     { "if", teash_if, NULL },
     { "skip", teash_skip, NULL },
     { "list", teash_list, NULL },
+    { "puts", teash_puts, NULL },
 
     { NULL, NULL, NULL }
 };
@@ -673,6 +684,7 @@ int teash_eval(char *line, teash_state_t *teash)
             /* find end */
             for(; !isspace(*p) && *p != '\0'; p++) {}
         }
+        if( *p == '\0' ) break;
         *p = '\0';
     }
 
