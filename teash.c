@@ -142,6 +142,7 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash); // TODO put prototypes
  * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
  * the end of the script.)
  *
+ * TODO Test this
  */
 int teash_goto_line(int argc, char **argv, teash_state_t *teash)
 {
@@ -327,6 +328,7 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
  * if "A > B" goto 16
  * if A>B goto 16
  *
+ * TODO Test this
  *
  */
 int teash_if(int argc, char **argv, teash_state_t *teash)
@@ -344,6 +346,7 @@ int teash_if(int argc, char **argv, teash_state_t *teash)
 
 /**
  * \brief Skip the next line if not zero
+ * TODO Test this
  */
 int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
@@ -433,12 +436,15 @@ int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
     int oldlen=0;
     int newlen = strlen(newline) + 3;
 
+    if(newlen == 3) /* oh, actually is deleting the whole line. */
+        newlen = 0;
+
     /* set oldline to where we want to insert. */
     for(oldline = teash->mem.mem_start;
         oldline < teash->mem.script_end; ) {
         tln  = (*oldline++) << 8;
         tln |= *oldline++;
-        if( tln > ln ) { /* XXX Test this. */
+        if( tln > ln ) {
             /* inserting a new line */
             oldlen = 0;
             oldline -= 2;
@@ -674,7 +680,7 @@ int teash_eval(char *line, teash_state_t *teash)
 }
 
 /** 
- * \breif take a line from user input and figure out wht to do
+ * \breif take a line from user input and figure out what to do
  *
  * Lines are ether executed or loaded into script memory.
  */
@@ -697,7 +703,7 @@ int teash_do_line(char *line, teash_state_t *teash)
         ln *= 10;
         ln += *p - '0';
     }
-    if( isspace(*p) ) {
+    if( isspace(*p) || *p == '\0' ) {
         for(; isspace(*p) && *p != '\0'; p++) {}
         return teash_load_line(ln, p, teash);
     }
