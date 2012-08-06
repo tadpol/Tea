@@ -571,13 +571,13 @@ char* teash_itoa(int i, char *b, unsigned max)
 
     /* ascii-fy (backwards.) */
     do {
-        *t = (i%10) - '0';
+        *t++ = (i%10) + '0';
         i /= 10;
     }while(i>0);
 
     if(sign == '-')
         *b++ = '-';
-    for(; t > tb && max > 0; max--) {
+    for(t--; t >= tb && max > 0; max--) {
         *b++ = *t--;
     }
     *b++ = '\0';
@@ -610,12 +610,11 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                     in++;
                     for(varlen=0; *in != '}' && *in != '\0'; in++, varlen++) {}
                 } else {
-                    for(varlen=0; !isalnum(*in) && *in != '\0'; in++, varlen++) {}
+                    for(varlen=0; isalnum(*in) && *in != '\0'; in++, varlen++) {}
                 }
                 /* Now look up variable */
                 if( varlen == 1 && isupper(*varname) ) {
-                    /* Number variable. grab is and ascii-fy it */
-                    /* FIXME needs work */
+                    /* Number variable. grab it and ascii-fy it */
                     out = teash_itoa(teash->mem.vars['A' - *varname], out, 99);
 #if 0
                 } else if( dict ) {
@@ -625,7 +624,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                     /* not found, copy as is ?or nothing? */
                     *out++ = '$';
                     for(; varlen > 0; varlen--) {
-                        *out++ = *in++;
+                        *out++ = *varname++;
                     }
                 }
             }
