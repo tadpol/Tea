@@ -307,16 +307,65 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
 {
     char *p;
     int es=0;
+    int acc=0;
+    int imd=0;
+    char op = '='; 
+
     /* drop "let" */
     argc--, argv++;
-    
+
     /* process exressions */
     for(; argc > 0; argc--, argv++) {
         p = *argv;
 
+        /* Very simple, left associating math expressions. */
+        for(; *p != '\0'; ) {
+            for(; isspace(*p) && *p != '\0'; p++) {}
+
+            if( isalnum(*p) ) {
+                if( isdigit(*p) ) {
+                    imd = strtoul(p, &p, 0);
+                } else {
+                    imd = teash->mem.vars['A' - *p];
+                    p++;
+                }
+                switch(op) {
+                    case '=': acc = imd; break;
+                    case '+': acc += imd; break;
+                    case '-': acc -= imd; break;
+                    case '*': acc *= imd; break;
+                    case '/': acc /= imd; break;
+                    case '%': acc %= imd; break;
+                    case '&': acc &= imd; break;
+                    case '|': acc |= imd; break;
+                    case '^': acc ^= imd; break;
+                }
+            } else {
+                switch(*p) {
+                    case '=':
+                    case '+':
+                    case '-':
+                    case '*': 
+                    case '/':
+                    case '%':
+                    case '&':
+                    case '|':
+                    case '^':
+                        op = *p;
+                        break;
+                    /* TODO add compare ops */
+                    default:
+                        /* unknown symbol, skip it */
+                        break;
+                }
+                p++;
+            }
+            
+        }
+
     }
 
-    return 0;
+    return acc;
 }
 /****************************************************************************/
 
