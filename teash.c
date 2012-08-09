@@ -319,6 +319,8 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
         p = *argv;
 
         /* Very simple, left associating math expressions. */
+        /* Doesn't set variables.  Still need to figure that out.
+         */
         for(; *p != '\0'; ) {
             for(; isspace(*p) && *p != '\0'; p++) {}
 
@@ -339,10 +341,16 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
                     case '&': acc &= imd; break;
                     case '|': acc |= imd; break;
                     case '^': acc ^= imd; break;
+                    case '>': acc = (acc > imd); break;
+                    case 'L': acc = (acc >= imd); break;
+                    case 'r': acc >>= imd; break;
+                    case '<': acc = (acc < imd); break;
+                    case 'G': acc = (acc <= imd); break;
+                    case 'l': acc <<= imd; break;
+                    case 'e': acc = (acc == imd); break;
                 }
             } else {
                 switch(*p) {
-                    case '=':
                     case '+':
                     case '-':
                     case '*': 
@@ -353,7 +361,29 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
                     case '^':
                         op = *p;
                         break;
-                    /* TODO add compare ops */
+                    case '=':
+                        p++;
+                        switch(*p) {
+                            case '=': op = 'e'; break;
+                            default: p--; op = '='; break;
+                        }
+                        break;
+                    case '>':
+                        p++;
+                        switch(*p) {
+                            case '>': op = 'r'; break;
+                            case '=': op = 'L'; break;
+                            default: p--; op = '>'; break;
+                        }
+                        break;
+                    case '<':
+                        p++;
+                        switch(*p) {
+                            case '<': op = 'l'; break;
+                            case '=': op = 'G'; break;
+                            default: p--; op = '<'; break;
+                        }
+                        break;
                     default:
                         /* unknown symbol, skip it */
                         break;
@@ -367,6 +397,7 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
 
     return acc;
 }
+
 /****************************************************************************/
 
 /**
