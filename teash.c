@@ -180,8 +180,6 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
         p = *argv;
 
         /* Very simple, left associating math expressions. */
-        /* Doesn't set variables.  Still need to figure that out.
-         */
         for(; *p != '\0'; ) {
             for(; isspace(*p) && *p != '\0'; p++) {}
 
@@ -269,8 +267,6 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
  * if "A > B" goto 16
  * if A>B goto 16
  *
- * TODO Test this
- *
  */
 int teash_if(int argc, char **argv, teash_state_t *teash)
 {
@@ -287,7 +283,6 @@ int teash_if(int argc, char **argv, teash_state_t *teash)
 
 /**
  * \brief Skip the next line if not zero
- * TODO Test this
  */
 int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
