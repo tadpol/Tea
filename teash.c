@@ -306,13 +306,21 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
 int teash_let(int argc, char **argv, teash_state_t *teash)
 {
     char *p;
-    int es=0;
+    char set = '\0';
     int acc=0;
     int imd=0;
     char op = '='; 
 
     /* drop "let" */
     argc--, argv++;
+
+    /* simplistic variable setting.  If first param is just a var, then we
+     * set to it.
+     */
+    if( isalpha(argv[0][0]) && argv[0][1] == '\0' ) {
+        set = argv[0][0];
+        argc--, argv++;
+    }
 
     /* process exressions */
     for(; argc > 0; argc--, argv++) {
@@ -390,13 +398,128 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
                 }
                 p++;
             }
-            
         }
+    }
 
+    if(set != '\0') {
+        teash->mem.vars['A' - set] = acc;
     }
 
     return acc;
 }
+#if 0
+int teash_let2(int argc, char **argv, teash_state_t *teash)
+{
+    char *p;
+    int nstack[11];
+    char opstack[11];
+    int *NS = nstack;
+    char *OP = opstack;
+    char op;
+
+    argc--, argv++; /* drop "let" */
+    
+    for(; argc > 0; argc--, argv++) {
+        p = *argv;
+
+        for(; *p != '\0'; ) {
+            for(; isspace(*p) && *p != '\0'; p++) {}
+
+            if( isdigit(*p) ) { /* numbers always push. */
+                *NS = strtoul(p, &p, 0);
+                NS++;
+            } else { /* op */
+                switch(*p) {
+                    case '+':
+                    case '-':
+                    case '*': 
+                    case '/':
+                    case '%':
+                    case '&':
+                    case '|':
+                    case '^':
+                    case '(':
+                    case ')':
+                        op = *p;
+                        break;
+                    case '=':
+                        p++;
+                        switch(*p) {
+                            case '=': op = 'e'; break;
+                            default: p--; op = '='; break;
+                        }
+                        break;
+                    case '>':
+                        p++;
+                        switch(*p) {
+                            case '>': op = 'r'; break;
+                            case '=': op = 'L'; break;
+                            default: p--; op = '>'; break;
+                        }
+                        break;
+                    case '<':
+                        p++;
+                        switch(*p) {
+                            case '<': op = 'l'; break;
+                            case '=': op = 'G'; break;
+                            default: p--; op = '<'; break;
+                        }
+                        break;
+                    default:
+                        /* unknown symbol, skip it */
+                        break;
+                }
+                p++;
+                /* check op stack */
+                if( OP > opstack && teash_let2_opcmp(op, *OP) /*op <= *OP*/ ) {
+                    /* stuff on stack, and it is Higher than us */
+                    /* ??? does this need to be in a loop ??? */
+                    int a = *(--NS);
+                    int b = *NS;
+                    a = teash_let2_doit(*(--OP), a, b);
+                    *NS = a;
+                    /* think the open paren is just pushed.
+                     * then the close does a rollup.
+                     */
+#if 0
+                    switch(*(--OP)) {
+                        case '=': a = b; break;
+                        case '+': a += b; break;
+                        case '-': a -= b; break;
+                        case '*': a *= b; break;
+                        case '/': a /= b; break;
+                        case '%': a %= b; break;
+                        case '&': a &= b; break;
+                        case '|': a |= b; break;
+                        case '^': a ^= b; break;
+                        case '>': a = (a > b); break;
+                        case 'L': a = (a >= b); break;
+                        case 'r': a >>= b; break;
+                        case '<': a = (a < b); break;
+                        case 'G': a = (a <= b); break;
+                        case 'l': a <<= b; break;
+                        case 'e': a = (a == b); break;
+                    }
+                    *NS++ = a;
+#endif
+                }
+                /* Now push new op to stack. */
+                *OP++ = op;
+            }
+        }
+    }
+
+    /* TODO collapse stack to single. */
+    while( OP > opstack ) {
+        int a = *(--NS);
+        int b = *NS;
+        a = teash_let2_doit(*(--OP), a, b);
+        *NS = a;
+    }
+
+    return *NS;
+}
+#endif
 
 /****************************************************************************/
 
