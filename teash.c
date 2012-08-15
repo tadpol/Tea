@@ -572,6 +572,16 @@ char* teash_itoa(int i, char *b, unsigned max)
  * \brief Find the $vars and replace them
  *
  * FIXME work in place.
+ *
+ * This is a in-string replacement; similar to how shells work.
+ * I may change it to argument replacement.
+ *  That is, after line is broken into arguments, check each arg.
+ *  if it starts with '$', then replace it.
+ *
+ * In-string works better for the number vars (A-Z) while Arg works better
+ * for the dictionary.  (Replacing with the dict will make it vary easy to
+ * overflow the line doing in-string. Dictionary Arg replacement just swaps
+ * pointers.)
  */
 int teash_subst(char *in, char *out, teash_state_t *teash)
 {
@@ -669,6 +679,11 @@ int teash_eval(char *line, teash_state_t *teash)
         *p = '\0';
     }
 
+    /* TODO save retcode somewhere.
+     * Could overload into one of the alpha vars, like Z
+     * Or could have some specials, like $?
+     * If I do a special, will need to make memory for it.
+     */
     return teash_exec(argc, argv, teash);
 }
 
