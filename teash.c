@@ -115,13 +115,22 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
 }
 
 /*****************************************************************************/
+/**
+ * \brief Erase the current script memory.
+ *
+ * \note doesn't actually erase anything, just moves the end.
+ */
 int teash_clear_script(int argc, char **argv, teash_state_t *teash)
 {
-    /* where is teash_state_t??? Assuming single global for now. */
     teash->mem.script_end = teash->mem.mem_start;
     return 0;
 }
 
+/**
+ * \brief Run the script.
+ *
+ * \note This is mostly equivalent to "goto 0". So we might drop it for space saving.
+ */
 int teash_run_script(int argc, char **argv, teash_state_t *teash)
 {
     if( teash->LP != NULL ) return -1; /* already running */
@@ -156,6 +165,40 @@ int teash_goto_line(int argc, char **argv, teash_state_t *teash)
 
 
 /****************************************************************************/
+/**
+ * \brief Evaluate a math expression and maybe save the result to a variable
+ *
+ * If the first param is just a variable, then the final result will get
+ * saved there.
+ *
+ * This is a left associative accumilator style math parser. For simple one
+ * operand expressions, it works just like infix notation.
+ *
+ * This parser has two numbers, the accumilator and the immeadiate.  The
+ * accumilator is initialized to zero.  The immeadiate is the number that
+ * was just parsed from the input.  There is one operand, and it is
+ * replaced as new once appear in the input.  The initial operand sets the
+ * accumilator to the immeadiate.  Once an immeadiate is parsed, the
+ * current operand is used to combine it into the accumilator.
+ *
+ * Numbers are in base ten unless the start with 0x, then they are in base
+ * sixteen.  The variables A thru Z can also be used (must be uppercase).
+ *
+ * This style of parser is simpler than a full infix, but cannot do very
+ * complex equations, since there is no nesting.  LET might get upgraded
+ * someday, or maybe I'll add a postfix notation along side for when more
+ * powerful equation are needed.
+ *
+ * Some examples:
+ * - Add four numbers: 1 + 2 3 4
+ *   Or: + 1 2 3 4
+ *   Both give 10
+ * - Subtract: 10 - 5 3
+ *   gives 2
+ *   However: - 10 5 3
+ *   gives -18 since the ACC starts with 0
+ * - Multiply: 2 * 3
+ */
 int teash_let(int argc, char **argv, teash_state_t *teash)
 {
     char *p;
@@ -267,13 +310,14 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
  * if "A > B" goto 16
  * if A>B goto 16
  *
+ * This may get dropped; use skip instead.
  */
 int teash_if(int argc, char **argv, teash_state_t *teash)
 {
     int ret=0;
     if( argc < 3 ) return -1;
 
-    argv[0] = "let";
+    //argv[0] = "let";
     ret = teash_let(2, argv, teash);
 
     if( ret == 0 ) return 0;
@@ -287,7 +331,7 @@ int teash_if(int argc, char **argv, teash_state_t *teash)
 int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
     if( argc < 2 ) return -1;
-    argv[0] = "let";
+    //argv[0] = "let";
     if( teash_let(argc, argv, teash) == 0 ) return 0;
 
     if( teash->LP == NULL ) return 0;
@@ -317,6 +361,9 @@ int teash_list(int argc, char **argv, teash_state_t *teash)
     return 0;
 }
 
+/**
+ * \brief Print the rest of the line to stdout
+ */
 int teash_puts(int argc, char **argv, teash_state_t *teash)
 {
     argc--, argv++;
@@ -479,11 +526,10 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
      * This is to handle the following:
      * - Have tree with commands defined at the following points:
      *   A
-     *   A B
-     *   A B C D
-     * - The command "A B C" is executed.
-     * - So a depth search we find node C, but there are no commands there,
-     *   so we need to backtrack to B.
+     *   A B C
+     * - The command "A B" is executed.
+     * - So a depth search we find node B, but there are no commands there,
+     *   so we need to backtrack to A.
      */
     for(ac--; ac > 0; ac--) {
         if( parents[ac]->cmd ) {
@@ -645,7 +691,7 @@ int teash_do_line(char *line, teash_state_t *teash)
     for(p=line; isspace(*p) && *p != '\0'; p++) {}
     if( *p == '\0' ) return 0;
 
-    /* is first work a number? */
+    /* is first word a number? */
     for(ln=0; isdigit(*p) && *p != '\0'; p++) {
         ln *= 10;
         ln += *p - '0';
