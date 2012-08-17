@@ -1,8 +1,9 @@
 
-#include <stdlib.h>
+#include <stdlib.h> /* strtoul, */
 #include <stdint.h>
-#include <string.h>
-#include <stdio.h>
+#include <string.h> /* strlen, memmove, strcpy, strncpy */
+#include <ctype.h> /* isalpha, isspace, isalnum, isdigit */
+#include <stdio.h> /* printf, fgets */
 
 /*
  * Inital memory layout:
