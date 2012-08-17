@@ -679,12 +679,9 @@ int teash_eval(char *line, teash_state_t *teash)
         *p = '\0';
     }
 
-    /* TODO save retcode somewhere.
-     * Could overload into one of the alpha vars, like Z
-     * Or could have some specials, like $?
-     * If I do a special, will need to make memory for it.
-     */
-    return teash_exec(argc, argv, teash);
+    /* Return value for last execed command is in Z */
+    teash->mem.vars['A'-'Z'] = teash_exec(argc, argv, teash);
+    return teash->mem.vars['A'-'Z'];
 }
 
 /** 
