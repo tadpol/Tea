@@ -601,6 +601,8 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
             in++;
             if( *in == '$' ) {
                 *out = '$';
+            } if( *in == '?' ) {
+                out = teash_itoa(teash->retVal, out, 99);
             } else {
                 /* Find the var name in the buffer */
                 varname = in;
