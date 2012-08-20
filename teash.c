@@ -5,23 +5,28 @@
 #include <stdio.h>
 
 /*
- * Inital memory layout:
+ * Memory for teash goes in three places.
+ * 1. The C Stack. Function local variables managed by the C compiler.
+ * 2. Session data. Stuff that is only useful for this session.
+ * 3. Savable data. Things that could be written out to persistant memory and recalled.
+ *
+ *
+ * Savable Memory
+ * --------------
+ *
+ * Inital savable memory layout:
  *  - Script space, grows up
  *  - Dictionary space, grows down
- *  - Fixed Return stack
  *  - Fixed vars
  * Gives us the following pointers:
  * - teash_mem_start    : fixed
  * - teash_script_end   : moving
  * - teash_dict_start   : moving
  * - teash_dict_end     : fixed
- * - teash_rsp          : moving
- * - teash_rs_end       : fixed
  * - teash_num_vars     : fixed
  * - teash_mem_end      : fixed
  *
  * Free memory is (teash_dict_start - teash_sript_end)
- *
  *
  * The script space is a series of lines.  Each line is two bytes BigE for
  * the line number. Some number of bytes for the line code, then a NUL
@@ -34,35 +39,32 @@
  * Number Variables are 26 variables A-Z. They are raw signed integers
  * (rather that the ascii version of them).
  *
- * I'm possibly thinking of merging the NumberVariables into the
- * Dictionary. Leaving this and the dictionary out until other parts are
- * debuged.
+ * You should be able to save and restore this memory byte for byte.
  *
- * The Return Stack area is between dict_end and num_vars.  It is intended
- * for things like gosub/return and loops.  Not sure if this is atually how
- * I want to use it, but am keeping a spot for it for now.
+ * Session Memory
+ * --------------
  *
+ * LP is the line pointer for executing the script.  When this is NULL, no
+ * script is running.  Otherwise it points the the lin being executed.
  *
+ * RS and returnStack are a stack of line numbers used for gosub/return and
+ * possibly other similar things. (looping)
  *
- * Also thinking to move 'line' from teash_mloop() and 'argv' from
- * teash_eval() into this memory block.  This would make the eval not
- * nestable; which is in line with the BASIC design.  Making this move
- * would get those two out of the C stack and in with all the other large
- * memory chunks that teash wants.
+ * root is the commands that can be run
  *
+ * retVal is the return value of the last executed command.
  */
 
 #define TEASH_LINE_MAX      80
 #define TEASH_PARAM_MAX     10
 #define TEASH_CMD_DEPTH_MAX 10
-#define TEASH_RS_SIZE       10  /* must be even. */
+#define TEASH_RS_SIZE       10
 
 struct teash_memory_s {
     uint8_t *mem_start;
     uint8_t *script_end;
     uint8_t *dict_start;
     uint8_t *dict_end;
-    uint16_t *RS;
     int32_t *vars;
     uint8_t *mem_end;
 };
@@ -79,10 +81,13 @@ struct teash_cmd_s {
 
 struct teash_state_s {
     struct teash_memory_s mem;
+    uint16_t returnStack[TEASH_RS_SIZE];
+
+    int32_t retVal;
+
     teash_cmd_t *root;
-
-
     char *LP;
+    uint16_t *RS;
 };
 
 teash_state_t teash_state;
@@ -94,7 +99,7 @@ teash_state_t teash_state;
 
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem)
 {
-    if( size <= (sizeof(uint32_t)*26)+(sizeof(uint16_t)*TEASH_RS_SIZE) )
+    if( size <= (sizeof(uint32_t)*26)+ (sizeof(uint16_t)*2 )
         return -1;
 
     if( (uint32_t)memory & 0x3UL ) /* Start isn't aligned */
@@ -107,8 +112,7 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
     mem->mem_end = memory + size;
 
     mem->vars = (int32_t*)(mem->mem_end - sizeof(int32_t)*26);
-    mem->dict_end = mem->mem_end - (sizeof(int32_t)*26+sizeof(uint16_t)*TEASH_RS_SIZE);
-    mem->RS = (uint16_t*)mem->dict_end;
+    mem->dict_end = mem->mem_end - sizeof(int32_t)*26;
     mem->dict_start = mem->dict_end;
 
     return 0;
