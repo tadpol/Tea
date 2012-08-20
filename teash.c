@@ -46,7 +46,7 @@
  * --------------
  *
  * LP is the line pointer for executing the script.  When this is NULL, no
- * script is running.  Otherwise it points the the lin being executed.
+ * script is running.  Otherwise it points the the line being executed.
  *
  * RS and returnStack are a stack of line numbers used for gosub/return and
  * possibly other similar things. (looping)
@@ -576,7 +576,7 @@ char* teash_itoa(int i, char *b, unsigned max)
 /**
  * \brief Find the $vars and replace them
  *
- * FIXME work in place.
+ * FIXME work in place. (maybe)
  *
  * This is a in-string replacement; similar to how shells work.
  * I may change it to argument replacement.
@@ -587,6 +587,12 @@ char* teash_itoa(int i, char *b, unsigned max)
  * for the dictionary.  (Replacing with the dict will make it vary easy to
  * overflow the line doing in-string. Dictionary Arg replacement just swaps
  * pointers.)
+ *
+ * Although, doing arg replacement won't let us do things that work like
+ * aliases. (define "go" as "goto 0"; eval "$go" and have it run goto with
+ * one argument, 0.) Counter is that this is a kludge, and if we really
+ * want macros, to really implement them.
+ *
  */
 int teash_subst(char *in, char *out, teash_state_t *teash)
 {
@@ -644,7 +650,9 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
  */
 int teash_eval(char *line, teash_state_t *teash)
 {
-    /* FIXME change line to be in place modifiable */
+    /* FIXME change line to be in place modifiable
+     * Doing so uses less stack space.
+     */
     char buf[TEASH_LINE_MAX+1]; // could move into state.
     char *argv[TEASH_PARAM_MAX+1]; // could move into state.
     char *p;

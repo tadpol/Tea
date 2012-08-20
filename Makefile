@@ -1,6 +1,8 @@
 
-CFLAGS+=-g -funsigned-char -DTEST_IT
-#CFLAGS+= -Os -funsigned-char -DTEST_IT
+## TODO stop manically switching between uint8_t and char.
+##      and drop the -funsigned-char
+#CFLAGS+=-g -funsigned-char -DTEST_IT
+CFLAGS+= -Os -funsigned-char -DTEST_IT
 
 all: teash
 
