@@ -62,12 +62,12 @@
 #define TEASH_RS_SIZE       10
 
 struct teash_memory_s {
-    uint8_t *mem_start;
-    uint8_t *script_end;
-    uint8_t *dict_start;
-    uint8_t *dict_end;
+    char *mem_start;
+    char *script_end;
+    char *dict_start;
+    char *dict_end;
     int32_t *vars;
-    uint8_t *mem_end;
+    char *mem_end;
 };
 
 typedef struct teash_state_s teash_state_t;
@@ -108,9 +108,9 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
     if( (uint32_t)(memory+size) & 0x3UL ) /* End isn't alined */
         return -3;
 
-    mem->mem_start = memory;
-    mem->script_end = memory;
-    mem->mem_end = memory + size;
+    mem->mem_start = (char*)memory;
+    mem->script_end = (char*)memory;
+    mem->mem_end = (char*)memory + size;
 
     mem->vars = (int32_t*)(mem->mem_end - sizeof(int32_t)*26);
     mem->dict_end = mem->mem_end - sizeof(int32_t)*26;
@@ -354,7 +354,7 @@ int teash_skip(int argc, char **argv, teash_state_t *teash)
  */
 int teash_list(int argc, char **argv, teash_state_t *teash)
 {
-    uint8_t *p;
+    char *p;
     uint16_t ln;
     for(p = teash->mem.mem_start; p < teash->mem.script_end; ) {
         ln = *p++;
@@ -404,7 +404,7 @@ teash_cmd_t teash_root_commands[] = {
  */
 char* teash_find_line(uint16_t ln, teash_state_t *teash)
 {
-    uint8_t *p = teash->mem.mem_start;
+    char *p = teash->mem.mem_start;
     uint16_t tln;
 
     while(p < teash->mem.script_end) {
@@ -430,7 +430,7 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash)
  */
 int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
 {
-    uint8_t *oldline = NULL;
+    char *oldline = NULL;
     uint16_t tln;
     int oldlen=0;
     int newlen = strlen(newline) + 3;
