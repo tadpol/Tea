@@ -1,6 +1,6 @@
 
-CFLAGS+=-g -DTEST_IT
-#CFLAGS+= -Os -DTEST_IT
+CFLAGS+=-g -funsigned-char -DTEST_IT
+#CFLAGS+= -Os -funsigned-char -DTEST_IT
 
 all: teash
 

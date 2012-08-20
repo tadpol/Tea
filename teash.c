@@ -100,7 +100,7 @@ teash_state_t teash_state;
 
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem)
 {
-    if( size <= (sizeof(uint32_t)*26)+ (sizeof(uint16_t)*2 )
+    if( size <= (sizeof(uint32_t)*26)+ (sizeof(uint16_t)*2) )
         return -1;
 
     if( (uint32_t)memory & 0x3UL ) /* Start isn't aligned */
@@ -344,7 +344,7 @@ int teash_skip(int argc, char **argv, teash_state_t *teash)
     /* Find next line */
     teash->LP += strlen(teash->LP) + 3;
     if( teash->LP >= (char*)teash->mem.script_end)
-        teash->LP == NULL;
+        teash->LP = NULL;
 
     return 0;
 }
