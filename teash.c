@@ -684,9 +684,7 @@ int teash_eval(char *line, teash_state_t *teash)
         *p = '\0';
     }
 
-    /* Return value for last execed command is in Z */
-    teash->mem.vars['A'-'Z'] = teash_exec(argc, argv, teash);
-    return teash->mem.vars['A'-'Z'];
+    return (teash->retVal = teash_exec(argc, argv, teash));
 }
 
 /** 
