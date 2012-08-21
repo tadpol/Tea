@@ -139,21 +139,18 @@ teash_cmd_t teash_root_commands[] = {
  */
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem)
 {
+    /* script and dict are byte addressed, so no alignment needed */
+    mem->mem_start = (char*)memory;
+    /* vars need to be 32bit aligned, so line up the end and stay inside. */
+    mem->mem_end = (char*)(((uint32_t)memory+size) & ~0x3);
+
     /* check if too small */
-    if( size <= (sizeof(uint32_t)*26)+ (sizeof(uint16_t)*2) )
+    if( size <= (sizeof(uint32_t)*26) + (sizeof(uint16_t)*2) + 10 )
         return -1;
 
-    if( (uint32_t)memory & 0x3UL ) /* Start isn't aligned */
-        return -2;
-    if( (uint32_t)(memory+size) & 0x3UL ) /* End isn't alined */
-        return -3;
-
-    mem->mem_start = (char*)memory;
-    mem->script_end = (char*)memory;
-    mem->mem_end = (char*)memory + size;
-
+    mem->script_end = mem->mem_start;
     mem->vars = (int32_t*)(mem->mem_end - sizeof(int32_t)*26);
-    mem->dict_end = mem->mem_end - sizeof(int32_t)*26;
+    mem->dict_end = (char*)mem->vars;
     mem->dict_start = mem->dict_end;
 
     return 0;
