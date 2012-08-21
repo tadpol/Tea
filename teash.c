@@ -359,7 +359,6 @@ int teash_if(int argc, char **argv, teash_state_t *teash)
     int ret=0;
     if( argc < 3 ) return -1;
 
-    //argv[0] = "let";
     ret = teash_let(2, argv, teash);
 
     if( ret == 0 ) return 0;
@@ -373,7 +372,6 @@ int teash_if(int argc, char **argv, teash_state_t *teash)
 int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
     if( argc < 2 ) return -1;
-    //argv[0] = "let";
     if( teash_let(argc, argv, teash) == 0 ) return 0;
 
     if( teash->LP == NULL ) return 0;
@@ -603,6 +601,55 @@ char* teash_itoa(int i, char *b, unsigned max)
     *b++ = '\0';
     return b;
 }
+
+#if 0
+unsigned teash_number_size(int32_t number)
+{
+#if 0
+    /* nice but uses log and doubles and expensive stuff. */
+    if(number == 0) return 1;
+    return (unsigned)(floor(log10(number))) + 1;
+#else
+    unsigned r = number<0?2:1;
+    uint32_t v = number<0?-number:number;
+
+    r += (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 : 
+         (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 : 
+         (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
+    return r;
+#endif
+}
+#endif
+
+/**
+ *
+ *
+ * replace bytes from atbeg to atend with byte in whatbeg to whatend;
+ * moving bytes from atend to attail if required. (but not going past XXXX)
+ *
+ * r.beg-r.end : range to be replaced.
+ * s.beg-s.end : range that replaces
+ * r.end-r.fin : range to be kept just after replacement.
+ * r.stop      : point that cannot grow over.
+ *
+ * if s.len is less than r.len, then everything 'shrinks'
+ * if s.len is more than r.len, then everything 'grows'
+ *   BUT it canot grow beyond r.stop
+ *
+ */
+#if 0
+char *teash_insert(char *rbeg, char *rend, char *rfin, char rstop,
+        char *sbeg, char*send)
+{
+    int change = (send-sbeg) - (rend-rbeg); /* negative means shrinking */
+    if( (rfin + change) > rstop ) {} /* too big, now what? */
+
+    if(change != 0) {
+        memmove(rbeg+(send-sbeg), rend, (rfin-rend));
+    }
+    memmove(rbeg, sbeg, (send-sbeg)); /* copy in data */
+}
+#endif
 
 /**
  * \brief Find the $vars and replace them
