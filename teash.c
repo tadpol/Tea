@@ -38,7 +38,7 @@
  * strings for later use.
  *
  * Number Variables are 26 variables A-Z. They are raw signed integers
- * (rather that the ascii version of them).
+ * (rather than the ascii version of them).
  *
  * You should be able to save and restore this memory byte for byte.
  *
@@ -91,15 +91,55 @@ struct teash_state_s {
     uint16_t *RS;
 };
 
-teash_state_t teash_state;
-
 /**
  * \breif How many bytes left for script or dict?
  */
 #define teash_has_free(teash) ((teash)->mem.dict_start - (teash)->mem.script_end)
 
+/* Function Prototypes */
+int teash_clear_script(int argc, char **argv, teash_state_t *teash);
+int teash_run_script(int argc, char **argv, teash_state_t *teash);
+int teash_goto_line(int argc, char **argv, teash_state_t *teash);
+int teash_let(int argc, char **argv, teash_state_t *teash);
+int teash_if(int argc, char **argv, teash_state_t *teash);
+int teash_skip(int argc, char **argv, teash_state_t *teash);
+int teash_list(int argc, char **argv, teash_state_t *teash);
+int teash_puts(int argc, char **argv, teash_state_t *teash);
+
+int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem);
+char* teash_find_line(uint16_t ln, teash_state_t *teash);
+int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash);
+int teash_exec(int argc, char **argv, teash_state_t *teash);
+int teash_subst(char *in, char *out, teash_state_t *teash);
+int teash_eval(char *line, teash_state_t *teash);
+int teash_do_line(char *line, teash_state_t *teash);
+int teash_mloop(teash_state_t *teash);
+
+/*****************************************************************************/
+/**
+ * \brief Default command set
+ */
+teash_cmd_t teash_root_commands[] = {
+    { "clear", teash_clear_script, NULL },
+    { "run", teash_run_script, NULL },
+    { "goto", teash_goto_line, NULL },
+    { "let", teash_let, NULL },
+    { "if", teash_if, NULL },
+    { "skip", teash_skip, NULL },
+    { "list", teash_list, NULL },
+    { "puts", teash_puts, NULL },
+    { NULL, NULL, NULL }
+};
+
+/* stuff above here will get moved to a header file someday */
+/*****************************************************************************/
+
+/**
+ * \brief Setup a memory area to store script, dictionary and variables.
+ */
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem)
 {
+    /* check if too small */
     if( size <= (sizeof(uint32_t)*26)+ (sizeof(uint16_t)*2) )
         return -1;
 
@@ -146,7 +186,6 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash)
     return 0;
 }
 
-char* teash_find_line(uint16_t ln, teash_state_t *teash); // TODO put prototypes somewhere.
 /**
  * \brief jump to specific line
  *
@@ -378,20 +417,6 @@ int teash_puts(int argc, char **argv, teash_state_t *teash)
     printf("\n");
     return 0;
 }
-
-/*****************************************************************************/
-teash_cmd_t teash_root_commands[] = {
-    { "clear", teash_clear_script, NULL },
-    { "run", teash_run_script, NULL },
-    { "goto", teash_goto_line, NULL },
-    { "let", teash_let, NULL },
-    { "if", teash_if, NULL },
-    { "skip", teash_skip, NULL },
-    { "list", teash_list, NULL },
-    { "puts", teash_puts, NULL },
-
-    { NULL, NULL, NULL }
-};
 
 /*****************************************************************************/
 
@@ -759,6 +784,7 @@ int teash_mloop(teash_state_t *teash)
 
 #ifdef TEST_IT
 uint8_t test_memory[4096];
+teash_state_t teash_state;
 
 int main(int argc, char **argv)
 {
