@@ -108,6 +108,7 @@ int teash_puts(int argc, char **argv, teash_state_t *teash);
 
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem);
 char* teash_find_line(uint16_t ln, teash_state_t *teash);
+void teash_next_line(teash_state_t *teash);
 int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash);
 int teash_exec(int argc, char **argv, teash_state_t *teash);
 int teash_subst(char *in, char *out, teash_state_t *teash);
@@ -377,10 +378,8 @@ int teash_skip(int argc, char **argv, teash_state_t *teash)
 
     if( teash->LP == NULL ) return 0;
 
-    /* Find next line */
-    teash->LP += strlen(teash->LP) + 3;
-    if( teash->LP >= (char*)teash->mem.script_end)
-        teash->LP = NULL;
+    /* Jump to next line */
+    teash_next_line(teash);
 
     return 0;
 }
@@ -442,6 +441,16 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash)
     }
 
     return NULL;
+}
+
+/**
+ * \brief Jump to the next line in the script.
+ */
+void teash_next_line(teash_state_t *teash)
+{
+    teash->LP += strlen(teash->LP) + 3;
+    if( teash->LP >= teash->mem.script_end)
+        teash->LP = NULL;
 }
 
 /**
@@ -765,9 +774,7 @@ int teash_mloop(teash_state_t *teash)
             line[TEASH_LINE_MAX] = '\0';
 
             /* Set up LP for the next line after this one */
-            teash->LP += strlen(teash->LP) + 3;
-            if( teash->LP >= (char*)teash->mem.script_end)
-                teash->LP = NULL;
+            teash_next_line(teash);
 
             /* eval this line */
             teash_eval(line, teash);
