@@ -70,7 +70,8 @@ struct teash_memory_s {
     char *mem_end;
 };
 #define teash_var2idx(v) ((v)-'?')
-#define TEASH_VAR_COUNT ('?'-'Z'+1)
+#define TEASH_VAR_COUNT ('Z'-'?'+1)
+#define teash_isvar(v) ((v) >= '?' && (v) <= 'Z')
 
 typedef struct teash_state_s teash_state_t;
 typedef int(*teash_f)(int,char**,teash_state_t*);
@@ -575,12 +576,17 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
     return -1;
 }
 
-#if 0
+/**
+ * \brief put ASCII form of number into stream.
+ *
+ * Not sure why doing it this way instead of sprintf
+ */
 char* teash_itoa(int i, char *b, unsigned max)
 {
     char tb[12];
     char *t = tb;
     char sign = '+';
+    if(max == 0) return;
 
     /* check sign */
     if( i < 0 ) {
@@ -594,162 +600,24 @@ char* teash_itoa(int i, char *b, unsigned max)
         i /= 10;
     }while(i>0);
 
+    if( (t-tb) > max ) {
+        /* not enough room, replace with underbar. */
+        *b++ = '_';
+        return b;
+    }
+
+    /* Put number into buffer */
     if(sign == '-')
         *b++ = '-';
-    for(t--; t >= tb && max > 0; max--) {
+    for(t--; t >= tb;) {
         *b++ = *t--;
     }
     *b++ = '\0';
     return b;
 }
-#else
-char* teash_insert_num(char *d, int dlen, int save, int dmax, int num)
-{
-    char tb[12];
-    char *t = tb;
-    char sign = '+';
-    /* check sign */
-    if( num < 0 ) {
-        sign = '-';
-        num = -num;
-    }
-
-    /* ascii-fy (backwards.) */
-    do {
-        *t++ = (num%10) + '0';
-        num /= 10;
-    }while(num>0);
-
-    int l = t-tb;
-    if( (l-dlen) > dmax) {
-        /* doesn't fit, overwrite var with _ and continue */
-        memset(d, '_', dlen);
-        return d+dlen;
-    }
-    if( (l-dlen) != 0 ) {
-        memmove(d+l, d+dlen, save);
-    }
-    if(sign == '-')
-        *d++ = '-';
-    for(t--; t >= tb;) {
-        *d++ = *t--;
-    }
-    return d;
-}
-#endif
-
-#if 0
-unsigned teash_number_size(int32_t number)
-{
-#if 0
-    /* nice but uses log and doubles and expensive stuff. */
-    if(number == 0) return 1;
-    return (unsigned)(floor(log10(number))) + 1;
-#else
-    unsigned r = number<0?2:1;
-    uint32_t v = number<0?-number:number;
-
-    r += (v >= 1000000000) ? 9 : (v >= 100000000) ? 8 : (v >= 10000000) ? 7 : 
-         (v >= 1000000) ? 6 : (v >= 100000) ? 5 : (v >= 10000) ? 4 : 
-         (v >= 1000) ? 3 : (v >= 100) ? 2 : (v >= 10) ? 1 : 0;
-    return r;
-#endif
-}
-#endif
-
-/**
- *
- *
- * replace bytes from atbeg to atend with byte in whatbeg to whatend;
- * moving bytes from atend to attail if required. (but not going past XXXX)
- *
- * r.beg-r.end : range to be replaced.
- * s.beg-s.end : range that replaces
- * r.end-r.fin : range to be kept just after replacement.
- * r.stop      : point that cannot grow over.
- *
- * if s.len is less than r.len, then everything 'shrinks'
- * if s.len is more than r.len, then everything 'grows'
- *   BUT it canot grow beyond r.stop
- *
- */
-#if 0
-char *teash_insert(char *rbeg, char *rend, char *rfin, char rstop,
-        char *sbeg, char*send)
-{
-    int change = (send-sbeg) - (rend-rbeg); /* negative means shrinking */
-    if( (rfin + change) > rstop ) {} /* too big, now what? */
-
-    if(change != 0) {
-        memmove(rbeg+(send-sbeg), rend, (rfin-rend));
-    }
-    memmove(rbeg, sbeg, (send-sbeg)); /* copy in data */
-}
-#endif
-/*
- * d-dlen : range that gets replaced
- * s-slen : range that is replacing
- * save   : amount after (d+dlen) to be moved
- * max    : max amount that replacement can grow
- */
-int teash_insert(char *d, int dlen, char *s, int slen, int save, int max)
-{
-    int change = slen - dlen; /* negative means shrinking */
-    if(change > max) return -1; /* not enough room, fail */
-    if(change != 0) {
-        /* move bytes to save */
-        memmove(d+slen, d+dlen, save);
-    }
-    memcpy(d, s, slen); /* move bytes replacing */
-    return 0;
-}
-
-#if 1
-int teash_subst(char *in, char* out, teash_state_t *teash)
-{
-    char *varname;
-    int varlen;
-    int length = strlen(in);
-
-    /* Look for variables (they start with $) */
-    for(; *in != '\0'; in++, length--) {
-        if( *in == '$' ) {
-            in++, length--;
-            if( *in == '$' ) {
-                memmove(in, in+1, length); /* slide it all down one */
-            } else {
-                /* Find the var name in the buffer */
-                varname = in;
-                if( *in =='{' ) {
-                    varname++;
-                    in++, length--;
-                    for(varlen=0; *in != '}' && *in != '\0'; in++, length--, varlen++) {}
-                } else {
-                    for(varlen=0; isalnum(*in) && *in != '\0'; in++, length--, varlen++) {}
-                }
-                /* Now look up variable */
-                if( varlen == 1 && *varname >= '?' && *varname <= 'Z' ) {
-                    in = teash_insert_num(varname, varlen, length,
-                            TEASH_LINE_MAX-0,
-                            teash->mem.vars[teash_var2idx(*varname)]);
-#if 0
-                } else if(in dict) {
-                } else {
-#endif
-                } else {
-                    /* not found, skip. */
-                }
-            }
-        }
-    }
-
-}
-#else
 
 /**
  * \brief Find the $vars and replace them
- *
- * FIXME work in place. (maybe)
  *
  * This is a in-string replacement; similar to how shells work.
  * I may change it to argument replacement.
@@ -771,6 +639,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
 {
     char *varname;
     int varlen;
+    char *oute = out+TEASH_LINE_MAX;
 
     /* Look for variables (they start with $) */
     for(; *in != '\0'; in++, out++) {
@@ -788,22 +657,19 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                     in++;
                     for(varlen=0; *in != '}' && *in != '\0'; in++, varlen++) {}
                 } else {
-                    for(varlen=0; isalnum(*in) && *in != '\0'; in++, varlen++) {}
+                    for(varlen=0;(isalnum(*in)||teash_isvar(*in)) && *in!='\0';
+                            in++, varlen++) {}
                 }
                 /* Now look up variable */
-                if( varlen == 1 && *varname >= '?' && *varname <= 'Z' ) {
+                if( varlen == 1 && teash_isvar(*varname) ) {
                     /* Number variable. grab it and ascii-fy it */
-                    out = teash_itoa(teash->mem.vars[teash_var2idx(*varname)], out, 99);
+                    out = teash_itoa(teash->mem.vars[teash_var2idx(*varname)], out, oute-out);
 #if 0
                 } else if( dict ) {
                     /* Is it in the dictionary? */
 #endif
                 } else {
-                    /* not found, copy as is ?or nothing? */
-                    *out++ = '$';
-                    for(; varlen > 0; varlen--) {
-                        *out++ = *varname++;
-                    }
+                    /* Variable not found, replace with nothing */
                 }
             }
         }
@@ -812,7 +678,6 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
     *out = '\0';
     return 0;
 }
-#endif
 
 /**
  * \brief take a line, do subs, and break it into params.
