@@ -1,6 +1,6 @@
 
-CFLAGS+=-Wpointer-sign -g -DTEST_IT
-#CFLAGS+= -Os -DTEST_IT
+#CFLAGS+=-Wall -g -DTEST_IT
+CFLAGS+=-Wall -Os -DTEST_IT
 
 all: teash
 

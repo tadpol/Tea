@@ -37,8 +37,11 @@
  * The dictionary is a bunch of key-value stings.  Primarily lets you save
  * strings for later use.
  *
- * Number Variables are 26 variables A-Z. They are raw signed integers
+ * Number Variables are 28 variables ?@A-Z. They are raw signed integers
  * (rather than the ascii version of them).
+ *
+ * ? and @ are special variables. The return code for every command is
+ * written to ?.  @ is reserved for a future use.
  *
  * You should be able to save and restore this memory byte for byte.
  *
@@ -196,7 +199,6 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash)
  */
 int teash_goto_line(int argc, char **argv, teash_state_t *teash)
 {
-    uint16_t tln;
     int ln;
 
     if( argc != 2 ) return -1;
@@ -206,6 +208,54 @@ int teash_goto_line(int argc, char **argv, teash_state_t *teash)
     return 0;
 }
 
+/**
+ * \brief Jump to a specific line, and remember where we came from.
+ *
+ * GOSUB is written such that they can be called from within a script or 
+ * from the prompt.  When called form the prompt, a RETURN will return to 
+ * the prompt.
+ */
+int teash_gosub(int argc, char **argv, teash_state_t *teash)
+{
+    int ln;
+    if(argc != 2) return -1;
+    if(teash->RS > &teash->returnStack[TEASH_RS_SIZE]) return -2; /* no return stack space left. */
+    if(teash->LP) {
+        /* push next line number into returnStack */
+        ln = *(teash->LP - 2);
+        ln <<= 8;
+        ln = *(teash->LP - 1);
+        *(teash->RS) = ln+1; /* plus one to be the line after this one */
+        teash->RS++;
+    }
+    /* else nothing to push onto returnStack, so just goto */
+    ln = strtoul(argv[1], NULL, 0);
+    teash->LP = teash_find_line(ln, teash);
+    return 0;
+}
+/**
+ * \brief return from a GOSUB
+ *
+ * Optionally can take a single param of a number, which is used as the
+ * return code.
+ */
+int teash_return(int argc, char **argv, teash_state_t *teash)
+{
+    int ret = 0;
+    int ln;
+    if(argc >= 2) {
+        ret = strtoul(argv[1], NULL, 0);
+    }
+    if(teash->RS <= teash->returnStack) {
+        /* nothing to pop, so return to prompt */
+        teash->LP = NULL;
+    } else {
+        ln = *(teash->RS);
+        teash->RS--;
+        teash->LP = teash_find_line(ln, teash);
+    }
+    return ret;
+}
 
 /****************************************************************************/
 /**
@@ -756,6 +806,10 @@ int teash_do_line(char *line, teash_state_t *teash)
 int teash_mloop(teash_state_t *teash)
 {
     char line[TEASH_LINE_MAX+1]; // could move into state.
+
+    /* initialize remaining state vars */
+    teash->LP = NULL;
+    teash->RS = teash->returnStack;
 
     while(1) {
         if( teash->LP == NULL ) {
