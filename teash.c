@@ -612,7 +612,6 @@ char* teash_itoa(int i, char *b, unsigned max)
     for(t--; t >= tb;) {
         *b++ = *t--;
     }
-    *b++ = '\0';
     return b;
 }
 
@@ -620,19 +619,10 @@ char* teash_itoa(int i, char *b, unsigned max)
  * \brief Find the $vars and replace them
  *
  * This is a in-string replacement; similar to how shells work.
- * I may change it to argument replacement.
- *  That is, after line is broken into arguments, check each arg.
- *  if it starts with '$', then replace it.
  *
- * In-string works better for the number vars (A-Z) while Arg works better
- * for the dictionary.  (Replacing with the dict will make it vary easy to
- * overflow the line doing in-string. Dictionary Arg replacement just swaps
- * pointers.)
- *
- * Although, doing arg replacement won't let us do things that work like
- * aliases. (define "go" as "goto 0"; eval "$go" and have it run goto with
- * one argument, 0.) Counter is that this is a kludge, and if we really
- * want macros, to really implement them.
+ * This works within the line length limits. If a replacement is too long
+ * to fit, it will get either nothing, or a '_'.
+ * XXX This behavor needs to be cleaned up.
  *
  */
 int teash_subst(char *in, char *out, teash_state_t *teash)
@@ -664,6 +654,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                 if( varlen == 1 && teash_isvar(*varname) ) {
                     /* Number variable. grab it and ascii-fy it */
                     out = teash_itoa(teash->mem.vars[teash_var2idx(*varname)], out, oute-out);
+                    out--;
 #if 0
                 } else if( dict ) {
                     /* Is it in the dictionary? */
@@ -687,9 +678,6 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
  */
 int teash_eval(char *line, teash_state_t *teash)
 {
-    /* FIXME change line to be in place modifiable
-     * Doing so uses less stack space.
-     */
     char buf[TEASH_LINE_MAX+1]; // could move into state.
     char *argv[TEASH_PARAM_MAX+1]; // could move into state.
     char *p;
