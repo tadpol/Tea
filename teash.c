@@ -66,9 +66,11 @@ struct teash_memory_s {
     char *script_end;
     char *dict_start;
     char *dict_end;
-    int32_t *vars;
+    int32_t *vars; // '?','@','A'...'Z' look at ASCII/UTF8 map.
     char *mem_end;
 };
+#define teash_var2idx(v) ((v)-'?')
+#define TEASH_VAR_COUNT ('?'-'Z'+1)
 
 typedef struct teash_state_s teash_state_t;
 typedef int(*teash_f)(int,char**,teash_state_t*);
@@ -83,8 +85,6 @@ struct teash_cmd_s {
 struct teash_state_s {
     struct teash_memory_s mem;
     uint16_t returnStack[TEASH_RS_SIZE];
-
-    int32_t retVal;
 
     teash_cmd_t *root;
     char *LP;
@@ -146,11 +146,11 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
     mem->mem_end = (char*)(((uint32_t)memory+size) & ~0x3);
 
     /* check if too small */
-    if( size <= (sizeof(uint32_t)*26) + (sizeof(uint16_t)*2) + 10 )
+    if( size <= (sizeof(uint32_t)*TEASH_VAR_COUNT) + (sizeof(uint16_t)*2) + 10 )
         return -1;
 
     mem->script_end = mem->mem_start;
-    mem->vars = (int32_t*)(mem->mem_end - sizeof(int32_t)*26);
+    mem->vars = (int32_t*)(mem->mem_end - sizeof(int32_t)*TEASH_VAR_COUNT);
     mem->dict_end = (char*)mem->vars;
     mem->dict_start = mem->dict_end;
 
@@ -272,7 +272,7 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
                 if( isdigit(*p) ) {
                     imd = strtoul(p, &p, 0);
                 } else {
-                    imd = teash->mem.vars['A' - *p];
+                    imd = teash->mem.vars[teash_var2idx(*p)];
                     p++;
                 }
                 switch(op) {
@@ -338,7 +338,7 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
     }
 
     if(set != '\0') {
-        teash->mem.vars['A' - set] = acc;
+        teash->mem.vars[teash_var2idx(set)] = acc;
     }
 
     return acc;
@@ -685,8 +685,6 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
             in++;
             if( *in == '$' ) {
                 *out = '$';
-            } if( *in == '?' ) {
-                out = teash_itoa(teash->retVal, out, 99);
             } else {
                 /* Find the var name in the buffer */
                 varname = in;
@@ -700,7 +698,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                 /* Now look up variable */
                 if( varlen == 1 && isupper(*varname) ) {
                     /* Number variable. grab it and ascii-fy it */
-                    out = teash_itoa(teash->mem.vars['A' - *varname], out, 99);
+                    out = teash_itoa(teash->mem.vars[teash_var2idx(*varname)], out, 99);
 #if 0
                 } else if( dict ) {
                     /* Is it in the dictionary? */
@@ -772,7 +770,7 @@ int teash_eval(char *line, teash_state_t *teash)
         *p = '\0';
     }
 
-    return (teash->retVal = teash_exec(argc, argv, teash));
+    return (teash->mem.vars[teash_var2idx('?')] = teash_exec(argc, argv, teash));
 }
 
 /** 
