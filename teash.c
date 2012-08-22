@@ -575,6 +575,7 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
     return -1;
 }
 
+#if 0
 char* teash_itoa(int i, char *b, unsigned max)
 {
     char tb[12];
@@ -601,6 +602,41 @@ char* teash_itoa(int i, char *b, unsigned max)
     *b++ = '\0';
     return b;
 }
+#else
+char* teash_insert_num(char *d, int dlen, int save, int dmax, int num)
+{
+    char tb[12];
+    char *t = tb;
+    char sign = '+';
+    /* check sign */
+    if( num < 0 ) {
+        sign = '-';
+        num = -num;
+    }
+
+    /* ascii-fy (backwards.) */
+    do {
+        *t++ = (num%10) + '0';
+        num /= 10;
+    }while(num>0);
+
+    int l = t-tb;
+    if( (l-dlen) > dmax) {
+        /* doesn't fit, overwrite var with _ and continue */
+        memset(d, '_', dlen);
+        return d+dlen;
+    }
+    if( (l-dlen) != 0 ) {
+        memmove(d+l, d+dlen, save);
+    }
+    if(sign == '-')
+        *d++ = '-';
+    for(t--; t >= tb;) {
+        *d++ = *t--;
+    }
+    return d;
+}
+#endif
 
 #if 0
 unsigned teash_number_size(int32_t number)
@@ -650,6 +686,65 @@ char *teash_insert(char *rbeg, char *rend, char *rfin, char rstop,
     memmove(rbeg, sbeg, (send-sbeg)); /* copy in data */
 }
 #endif
+/*
+ * d-dlen : range that gets replaced
+ * s-slen : range that is replacing
+ * save   : amount after (d+dlen) to be moved
+ * max    : max amount that replacement can grow
+ */
+int teash_insert(char *d, int dlen, char *s, int slen, int save, int max)
+{
+    int change = slen - dlen; /* negative means shrinking */
+    if(change > max) return -1; /* not enough room, fail */
+    if(change != 0) {
+        /* move bytes to save */
+        memmove(d+slen, d+dlen, save);
+    }
+    memcpy(d, s, slen); /* move bytes replacing */
+    return 0;
+}
+
+#if 1
+int teash_subst(char *in, char* out, teash_state_t *teash)
+{
+    char *varname;
+    int varlen;
+    int length = strlen(in);
+
+    /* Look for variables (they start with $) */
+    for(; *in != '\0'; in++, length--) {
+        if( *in == '$' ) {
+            in++, length--;
+            if( *in == '$' ) {
+                memmove(in, in+1, length); /* slide it all down one */
+            } else {
+                /* Find the var name in the buffer */
+                varname = in;
+                if( *in =='{' ) {
+                    varname++;
+                    in++, length--;
+                    for(varlen=0; *in != '}' && *in != '\0'; in++, length--, varlen++) {}
+                } else {
+                    for(varlen=0; isalnum(*in) && *in != '\0'; in++, length--, varlen++) {}
+                }
+                /* Now look up variable */
+                if( varlen == 1 && *varname >= '?' && *varname <= 'Z' ) {
+                    in = teash_insert_num(varname, varlen, length,
+                            TEASH_LINE_MAX-0,
+                            teash->mem.vars[teash_var2idx(*varname)]);
+#if 0
+                } else if(in dict) {
+                } else {
+#endif
+                } else {
+                    /* not found, skip. */
+                }
+            }
+        }
+    }
+
+}
+#else
 
 /**
  * \brief Find the $vars and replace them
@@ -696,7 +791,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                     for(varlen=0; isalnum(*in) && *in != '\0'; in++, varlen++) {}
                 }
                 /* Now look up variable */
-                if( varlen == 1 && isupper(*varname) ) {
+                if( varlen == 1 && *varname >= '?' && *varname <= 'Z' ) {
                     /* Number variable. grab it and ascii-fy it */
                     out = teash_itoa(teash->mem.vars[teash_var2idx(*varname)], out, 99);
 #if 0
@@ -717,6 +812,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
     *out = '\0';
     return 0;
 }
+#endif
 
 /**
  * \brief take a line, do subs, and break it into params.
