@@ -586,7 +586,7 @@ char* teash_itoa(int i, char *b, unsigned max)
     char tb[12];
     char *t = tb;
     char sign = '+';
-    if(max == 0) return;
+    if(max == 0) return b;
 
     /* check sign */
     if( i < 0 ) {
