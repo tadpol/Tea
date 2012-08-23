@@ -41,7 +41,10 @@
  * (rather than the ascii version of them).
  *
  * ? and @ are special variables. The return code for every command is
- * written to ?.  @ is reserved for a future use.
+ * written to ?. 
+ * @ is the line number for the line either the current or next line; 
+ * writing to @ does not change which line will be evaled next.
+ * The usage of @ will probably change.
  *
  * You should be able to save and restore this memory byte for byte.
  *
@@ -103,7 +106,7 @@ struct teash_state_s {
 /* Function Prototypes */
 int teash_clear_script(int argc, char **argv, teash_state_t *teash);
 int teash_run_script(int argc, char **argv, teash_state_t *teash);
-int teash_goto_line(int argc, char **argv, teash_state_t *teash);
+int teash_goto(int argc, char **argv, teash_state_t *teash);
 int teash_let(int argc, char **argv, teash_state_t *teash);
 int teash_if(int argc, char **argv, teash_state_t *teash);
 int teash_skip(int argc, char **argv, teash_state_t *teash);
@@ -111,7 +114,7 @@ int teash_list(int argc, char **argv, teash_state_t *teash);
 int teash_puts(int argc, char **argv, teash_state_t *teash);
 
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem);
-char* teash_find_line(uint16_t ln, teash_state_t *teash);
+void teash_goto_line(uint16_t ln, teash_state_t *teash);
 void teash_next_line(teash_state_t *teash);
 int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash);
 int teash_exec(int argc, char **argv, teash_state_t *teash);
@@ -127,7 +130,7 @@ int teash_mloop(teash_state_t *teash);
 teash_cmd_t teash_root_commands[] = {
     { "clear", teash_clear_script, NULL },
     { "run", teash_run_script, NULL },
-    { "goto", teash_goto_line, NULL },
+    { "goto", teash_goto, NULL },
     { "let", teash_let, NULL },
     { "if", teash_if, NULL },
     { "skip", teash_skip, NULL },
@@ -197,14 +200,14 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash)
  * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
  * the end of the script.)
  */
-int teash_goto_line(int argc, char **argv, teash_state_t *teash)
+int teash_goto(int argc, char **argv, teash_state_t *teash)
 {
     int ln;
 
     if( argc != 2 ) return -1;
 
     ln = strtoul(argv[1], NULL, 0);
-    teash->LP = teash_find_line(ln, teash);
+    teash_goto_line(ln, teash);
     return 0;
 }
 
@@ -214,23 +217,33 @@ int teash_goto_line(int argc, char **argv, teash_state_t *teash)
  * GOSUB is written such that they can be called from within a script or 
  * from the prompt.  When called form the prompt, a RETURN will return to 
  * the prompt.
+ *
+ * TODO think about other ways to do this.
  */
 int teash_gosub(int argc, char **argv, teash_state_t *teash)
 {
     int ln;
     if(argc != 2) return -1;
     if(teash->RS > &teash->returnStack[TEASH_RS_SIZE]) return -2; /* no return stack space left. */
+#if 0
     if(teash->LP) {
         /* push next line number into returnStack */
         ln = *(teash->LP - 2);
         ln <<= 8;
         ln = *(teash->LP - 1);
-        *(teash->RS) = ln+1; /* plus one to be the line after this one */
+        /* LP is the next line to run, not current. */
+        *(teash->RS) = ln;
         teash->RS++;
     }
+#else
+    if(teash->LP) {
+        *(teash->RS) = teash->mem.vars[teash_var2idx('@')];
+        teash->RS++;
+    }
+#endif
     /* else nothing to push onto returnStack, so just goto */
     ln = strtoul(argv[1], NULL, 0);
-    teash->LP = teash_find_line(ln, teash);
+    teash_goto_line(ln, teash);
     return 0;
 }
 /**
@@ -252,7 +265,7 @@ int teash_return(int argc, char **argv, teash_state_t *teash)
     } else {
         ln = *(teash->RS);
         teash->RS--;
-        teash->LP = teash_find_line(ln, teash);
+        teash_goto_line(ln, teash);
     }
     return ret;
 }
@@ -466,13 +479,13 @@ int teash_puts(int argc, char **argv, teash_state_t *teash)
 /*****************************************************************************/
 
 /**
- * \brief Find a line (or the next one if not exact)
+ * \brief Goto a line (or the next one if not exact)
  *
  * Finds a line or the next following.  If looking for line 22, but only
  * lines 20 and 25 exist, will return line 25.
  *
  */
-char* teash_find_line(uint16_t ln, teash_state_t *teash)
+void teash_goto_line(uint16_t ln, teash_state_t *teash)
 {
     char *p = teash->mem.mem_start;
     uint16_t tln;
@@ -482,14 +495,18 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash)
         tln <<=8;
         tln |= *p++;
 
-        if( tln >= ln )
-            return p;
+        if( tln >= ln ) {
+            teash->LP = p;
+            teash->mem.vars[teash_var2idx('@')] = tln;
+            return;
+        }
 
         tln = strlen(p) + 1;
         p += tln;
     }
 
-    return NULL;
+    teash->LP = NULL;
+    teash->mem.vars[teash_var2idx('@')] = -1;
 }
 
 /**
@@ -497,9 +514,15 @@ char* teash_find_line(uint16_t ln, teash_state_t *teash)
  */
 void teash_next_line(teash_state_t *teash)
 {
-    teash->LP += strlen(teash->LP) + 3;
-    if( teash->LP >= teash->mem.script_end)
+    int ln;
+    teash->LP += strlen(teash->LP) + 1; /* move to end of line and past \0 */
+    ln = teash->LP[0] << 8 | teash->LP[1]; /* save line number */
+    teash->LP += 2; /* Move past line number */
+    if( teash->LP >= teash->mem.script_end) {
         teash->LP = NULL;
+        ln = -1; /* not running */
+    }
+    teash->mem.vars[teash_var2idx('@')] = ln;
 }
 
 /**
