@@ -41,10 +41,7 @@
  * (rather than the ascii version of them).
  *
  * ? and @ are special variables. The return code for every command is
- * written to ?. 
- * @ is the line number for the line either the current or next line; 
- * writing to @ does not change which line will be evaled next.
- * The usage of @ will probably change.
+ * written to ?.  @ is reserved for a future use.
  *
  * You should be able to save and restore this memory byte for byte.
  *
@@ -94,9 +91,12 @@ struct teash_state_s {
     uint16_t returnStack[TEASH_RS_SIZE];
 
     teash_cmd_t *root;
-    char *LP;
+    char *LP; /* The next line to eval */
     uint16_t *RS;
 };
+
+#define teash_LP_lineno(teash) (((teash)->LP==NULL)?-1:((*((teash)->LP -2)<<8)|(*((teash)->LP -1))))
+
 
 /**
  * \breif How many bytes left for script or dict?
@@ -225,7 +225,6 @@ int teash_gosub(int argc, char **argv, teash_state_t *teash)
     int ln;
     if(argc != 2) return -1;
     if(teash->RS > &teash->returnStack[TEASH_RS_SIZE]) return -2; /* no return stack space left. */
-#if 0
     if(teash->LP) {
         /* push next line number into returnStack */
         ln = *(teash->LP - 2);
@@ -235,12 +234,6 @@ int teash_gosub(int argc, char **argv, teash_state_t *teash)
         *(teash->RS) = ln;
         teash->RS++;
     }
-#else
-    if(teash->LP) {
-        *(teash->RS) = teash->mem.vars[teash_var2idx('@')];
-        teash->RS++;
-    }
-#endif
     /* else nothing to push onto returnStack, so just goto */
     ln = strtoul(argv[1], NULL, 0);
     teash_goto_line(ln, teash);
@@ -497,7 +490,6 @@ void teash_goto_line(uint16_t ln, teash_state_t *teash)
 
         if( tln >= ln ) {
             teash->LP = p;
-            teash->mem.vars[teash_var2idx('@')] = tln;
             return;
         }
 
@@ -506,7 +498,6 @@ void teash_goto_line(uint16_t ln, teash_state_t *teash)
     }
 
     teash->LP = NULL;
-    teash->mem.vars[teash_var2idx('@')] = -1;
 }
 
 /**
@@ -514,15 +505,9 @@ void teash_goto_line(uint16_t ln, teash_state_t *teash)
  */
 void teash_next_line(teash_state_t *teash)
 {
-    int ln;
-    teash->LP += strlen(teash->LP) + 1; /* move to end of line and past \0 */
-    ln = teash->LP[0] << 8 | teash->LP[1]; /* save line number */
-    teash->LP += 2; /* Move past line number */
-    if( teash->LP >= teash->mem.script_end) {
+    teash->LP += strlen(teash->LP) + 3;
+    if( teash->LP >= teash->mem.script_end)
         teash->LP = NULL;
-        ln = -1; /* not running */
-    }
-    teash->mem.vars[teash_var2idx('@')] = ln;
 }
 
 /**
