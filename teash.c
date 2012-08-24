@@ -107,6 +107,7 @@ struct teash_state_s {
 int teash_clear_script(int argc, char **argv, teash_state_t *teash);
 int teash_run_script(int argc, char **argv, teash_state_t *teash);
 int teash_goto(int argc, char **argv, teash_state_t *teash);
+int teash_gojump(int argc, char **argv, teash_state_t *teash);
 int teash_let(int argc, char **argv, teash_state_t *teash);
 int teash_if(int argc, char **argv, teash_state_t *teash);
 int teash_skip(int argc, char **argv, teash_state_t *teash);
@@ -130,7 +131,9 @@ int teash_mloop(teash_state_t *teash);
 teash_cmd_t teash_root_commands[] = {
     { "clear", teash_clear_script, NULL },
     { "run", teash_run_script, NULL },
-    { "goto", teash_goto, NULL },
+    { "goto", teash_gojump, NULL },
+    { "gosub", teash_gojump, NULL },
+    { "return", teash_gojump, NULL },
     { "let", teash_let, NULL },
     { "if", teash_if, NULL },
     { "skip", teash_skip, NULL },
@@ -190,7 +193,7 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash)
 
     return 0;
 }
-
+#if 0
 /**
  * \brief jump to specific line
  *
@@ -262,6 +265,57 @@ int teash_return(int argc, char **argv, teash_state_t *teash)
     }
     return ret;
 }
+#else
+
+/**
+ * \brief Goto, Gosub, and Return all together since they're mostly the same
+ *
+ * This jumps to the next equal-or-greater line. (or to the end.)
+ *
+ * FE: if the script only has lines 10 and 20, and sees a "goto 15", it will
+ * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
+ * the end of the script.) This is the same for gosub.
+ *
+ * This is written so that it works from the command prompt.  It jumps into 
+ * the script to the line requested.  
+ *
+ * The difference between goto and gosub is that gosub pushes the next line 
+ * onto the return stack. (unless the return stack is full)
+ *
+ * Return pops the return stack and goes to that line.  If the return stack 
+ * is empty, return exits the script and goes to the command prompt.
+ *
+ */
+int teash_gojump(int argc, char **argv, teash_state_t *teash)
+{
+    int ln = 0;
+    int ret = 0;
+    if(argc > 1) {
+        ln = strtoul(argv[1], NULL, 0);
+    }
+
+    if( argv[0][0] == 'r' ) { /* must be 'return' */
+        ret = ln; /* argv[1] is actually return value */
+        if(teash->RS <= teash->returnStack) {
+            return ret;
+        } else {
+            ln = *(teash->RS);
+            teash->RS--;
+        }
+    } else if(argv[0][2] == 's') { /* goSub, not goTo */
+        if(teash->RS > &teash->returnStack[TEASH_RS_SIZE]) return -2; /* no return stack space left. */
+        if(teash->LP) {
+            /* LP is the next line to run, not current. */
+            *(teash->RS) = (*(teash->LP-2) <<8) | *(teash->LP-1);
+            teash->RS++;
+        }
+    }
+    /* else is goto. */
+
+    teash_goto_line(ln, teash);
+    return ret;
+}
+#endif
 
 /****************************************************************************/
 /**
