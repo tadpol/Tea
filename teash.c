@@ -124,22 +124,6 @@ int teash_eval(char *line, teash_state_t *teash);
 int teash_do_line(char *line, teash_state_t *teash);
 int teash_mloop(teash_state_t *teash);
 
-/*****************************************************************************/
-/**
- * \brief Default command set
- */
-teash_cmd_t teash_root_commands[] = {
-    { "clear", teash_clear_script, NULL },
-    { "run", teash_run_script, NULL },
-    { "goto", teash_gojump, NULL },
-    { "gosub", teash_gojump, NULL },
-    { "return", teash_gojump, NULL },
-    { "let", teash_let, NULL },
-    { "skip", teash_skip, NULL },
-    { "list", teash_list, NULL },
-    { "puts", teash_puts, NULL },
-    { NULL, NULL, NULL }
-};
 
 /* stuff above here will get moved to a header file someday */
 /*****************************************************************************/
@@ -805,6 +789,18 @@ int teash_mloop(teash_state_t *teash)
 #ifdef TEST_IT
 uint8_t test_memory[4096];
 teash_state_t teash_state;
+teash_cmd_t teash_root_commands[] = {
+    { "clear", teash_clear_script, NULL },
+    { "run", teash_run_script, NULL },
+    { "goto", teash_gojump, NULL },
+    { "gosub", teash_gojump, NULL },
+    { "return", teash_gojump, NULL },
+    { "let", teash_let, NULL },
+    { "skip", teash_skip, NULL },
+    { "list", teash_list, NULL },
+    { "puts", teash_puts, NULL },
+    { NULL, NULL, NULL }
+};
 
 int main(int argc, char **argv)
 {
