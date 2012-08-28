@@ -1,6 +1,7 @@
 
 #include <stdlib.h> /* strtoul, */
 #include <stdint.h>
+#include <stddef.h> /* ptrdiff_t */
 #include <string.h> /* strlen, memmove, strcpy, strncpy */
 #include <ctype.h> /* isalpha, isspace, isalnum, isdigit */
 #include <stdio.h> /* printf, fgets */
@@ -153,7 +154,7 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
     /* script and dict are byte addressed, so no alignment needed */
     mem->mem_start = (char*)memory;
     /* vars need to be 32bit aligned, so line up the end and stay inside. */
-    mem->mem_end = (char*)(((uint32_t)memory+size) & ~0x3);
+    mem->mem_end = (char*)(((ptrdiff_t)memory+size) & ~0x3);
 
     /* check if too small */
     if( size <= (sizeof(uint32_t)*TEASH_VAR_COUNT) + (sizeof(uint16_t)*2) + 10 )
