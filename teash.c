@@ -110,7 +110,6 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash);
 int teash_goto(int argc, char **argv, teash_state_t *teash);
 int teash_gojump(int argc, char **argv, teash_state_t *teash);
 int teash_let(int argc, char **argv, teash_state_t *teash);
-int teash_if(int argc, char **argv, teash_state_t *teash);
 int teash_skip(int argc, char **argv, teash_state_t *teash);
 int teash_list(int argc, char **argv, teash_state_t *teash);
 int teash_puts(int argc, char **argv, teash_state_t *teash);
@@ -136,7 +135,6 @@ teash_cmd_t teash_root_commands[] = {
     { "gosub", teash_gojump, NULL },
     { "return", teash_gojump, NULL },
     { "let", teash_let, NULL },
-    { "if", teash_if, NULL },
     { "skip", teash_skip, NULL },
     { "list", teash_list, NULL },
     { "puts", teash_puts, NULL },
@@ -457,26 +455,6 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
 }
 
 /****************************************************************************/
-
-/**
- * \brief if test is not zero, then exec rest of line
- *
- * if "A > B" goto 16
- * if A>B goto 16
- *
- * This may get dropped; use skip instead.
- */
-int teash_if(int argc, char **argv, teash_state_t *teash)
-{
-    int ret=0;
-    if( argc < 3 ) return -1;
-
-    ret = teash_let(2, argv, teash);
-
-    if( ret == 0 ) return 0;
-
-    return teash_exec(argc-2, argv+2, teash);
-}
 
 /**
  * \brief Skip the next line if not zero
