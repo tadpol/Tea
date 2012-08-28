@@ -192,79 +192,6 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash)
 
     return 0;
 }
-#if 0
-/**
- * \brief jump to specific line
- *
- * This jumps to the next equal-or-greater line. (or to the end.)
- *
- * FE: if the script only has lines 10 and 20, and sees a "goto 15", it will
- * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
- * the end of the script.)
- */
-int teash_goto(int argc, char **argv, teash_state_t *teash)
-{
-    int ln;
-
-    if( argc != 2 ) return -1;
-
-    ln = strtoul(argv[1], NULL, 0);
-    teash_goto_line(ln, teash);
-    return 0;
-}
-
-/**
- * \brief Jump to a specific line, and remember where we came from.
- *
- * GOSUB is written such that they can be called from within a script or 
- * from the prompt.  When called form the prompt, a RETURN will return to 
- * the prompt.
- *
- * TODO think about other ways to do this.
- */
-int teash_gosub(int argc, char **argv, teash_state_t *teash)
-{
-    int ln;
-    if(argc != 2) return -1;
-    if(teash->RS > &teash->returnStack[TEASH_RS_SIZE]) return -2; /* no return stack space left. */
-    if(teash->LP) {
-        /* push next line number into returnStack */
-        ln = *(teash->LP - 2);
-        ln <<= 8;
-        ln = *(teash->LP - 1);
-        /* LP is the next line to run, not current. */
-        *(teash->RS) = ln;
-        teash->RS++;
-    }
-    /* else nothing to push onto returnStack, so just goto */
-    ln = strtoul(argv[1], NULL, 0);
-    teash_goto_line(ln, teash);
-    return 0;
-}
-/**
- * \brief return from a GOSUB
- *
- * Optionally can take a single param of a number, which is used as the
- * return code.
- */
-int teash_return(int argc, char **argv, teash_state_t *teash)
-{
-    int ret = 0;
-    int ln;
-    if(argc >= 2) {
-        ret = strtoul(argv[1], NULL, 0);
-    }
-    if(teash->RS <= teash->returnStack) {
-        /* nothing to pop, so return to prompt */
-        teash->LP = NULL;
-    } else {
-        ln = *(teash->RS);
-        teash->RS--;
-        teash_goto_line(ln, teash);
-    }
-    return ret;
-}
-#else
 
 /**
  * \brief Goto, Gosub, and Return all together since they're mostly the same
@@ -284,6 +211,7 @@ int teash_return(int argc, char **argv, teash_state_t *teash)
  * Return pops the return stack and goes to that line.  If the return stack 
  * is empty, return exits the script and goes to the command prompt.
  *
+ * TODO test gosub and return
  */
 int teash_gojump(int argc, char **argv, teash_state_t *teash)
 {
@@ -314,7 +242,6 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
     teash_goto_line(ln, teash);
     return ret;
 }
-#endif
 
 /****************************************************************************/
 /**
