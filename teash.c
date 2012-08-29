@@ -96,8 +96,6 @@ struct teash_state_s {
     uint16_t *RS;
 };
 
-#define teash_LP_lineno(teash) (((teash)->LP==NULL)?-1:((*((teash)->LP -2)<<8)|(*((teash)->LP -1))))
-
 
 /**
  * \breif How many bytes left for script or dict?
@@ -393,9 +391,9 @@ int teash_list(int argc, char **argv, teash_state_t *teash)
     char *p;
     uint16_t ln;
     for(p = teash->mem.mem_start; p < teash->mem.script_end; ) {
-        ln = *p++;
+        ln = *(uint8_t*)p++;
         ln <<= 8;
-        ln |= *p++;
+        ln |= *(uint8_t*)p++;
         printf("%5u %s\n", ln, p);
         p += strlen(p) + 1;
     }
@@ -430,9 +428,9 @@ void teash_goto_line(uint16_t ln, teash_state_t *teash)
     uint16_t tln;
 
     while(p < teash->mem.script_end) {
-        tln = *p++;
+        tln = *(uint8_t*)p++;
         tln <<=8;
-        tln |= *p++;
+        tln |= *(uint8_t*)p++;
 
         if( tln >= ln ) {
             teash->LP = p;
@@ -475,8 +473,8 @@ int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
     /* set oldline to where we want to insert. */
     for(oldline = teash->mem.mem_start;
         oldline < teash->mem.script_end; ) {
-        tln  = (*oldline++) << 8;
-        tln |= *oldline++;
+        tln  = (*(uint8_t*)oldline++) << 8;
+        tln |= *(uint8_t*)oldline++;
         if( tln > ln ) {
             /* inserting a new line */
             oldlen = 0;
@@ -515,8 +513,8 @@ int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
 
     /* now we can copy it in (unless there is nothing to copy) */
     if( newlen > 3 ) {
-        *oldline++ = (ln >> 8)&0xff;
-        *oldline++ = ln & 0xff;
+        *(uint8_t*)oldline++ = (ln >> 8)&0xff;
+        *(uint8_t*)oldline++ = ln & 0xff;
         strcpy(oldline, newline);
     }
 
