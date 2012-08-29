@@ -195,7 +195,6 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash)
  * Return pops the return stack and goes to that line.  If the return stack 
  * is empty, return exits the script and goes to the command prompt.
  *
- * TODO test gosub and return
  */
 int teash_gojump(int argc, char **argv, teash_state_t *teash)
 {
@@ -210,8 +209,8 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
         if(teash->RS <= teash->returnStack) {
             return ret;
         } else {
-            ln = *(teash->RS);
             teash->RS--;
+            ln = *(teash->RS);
         }
     } else if(argv[0][2] == 's') { /* goSub, not goTo */
         if(teash->RS > &teash->returnStack[TEASH_RS_SIZE]) return -2; /* no return stack space left. */
@@ -275,6 +274,7 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
 
     /* simplistic variable setting.  If first param is just a var, then we
      * set to it.
+     * Not liking this; think about how to fix.
      */
     if( isalpha(argv[0][0]) && argv[0][1] == '\0' ) {
         set = argv[0][0];
@@ -369,6 +369,8 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
 
 /**
  * \brief Skip the next line if not zero
+ *
+ * \note "skip A" won't do what you might think.  should fix.
  */
 int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
