@@ -526,13 +526,11 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
     teash_cmd_t *parents[TEASH_CMD_DEPTH_MAX];
     teash_cmd_t *current = teash->root;
 
-    /* FIXME or verify: params passed must include command name as argv[0].
+    /* params passed must include command name as argv[0].
      * For nested commands, only the right most is passed in.
      * So for a cmd "spi flash dump 256 32" argv[0] is "dump"
-     *
-     * XXX Test nested commands.
      */
-    for(; current->name != NULL; current++) {
+    for(; current->name != NULL; ) {
         if( strcmp(current->name, argv[ac]) == 0) {
             /* Matched name. */
             if( current->sub == NULL || (argc-ac) == 1) {
@@ -549,6 +547,7 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
                 continue; /* Does this skip the current++ ??  it MUST */
             }
         }
+        current++;
     }
 
     /* No command to call at deepest find, backtrack up to see if we missed
@@ -794,6 +793,12 @@ teash_cmd_t teash_root_commands[] = {
     { "skip", teash_skip, NULL },
     { "list", teash_list, NULL },
     { "puts", teash_puts, NULL },
+    { "deep", NULL, (teash_cmd_t[]){
+        { "A", teash_puts, NULL },
+        { "B", teash_puts, NULL },
+        { "C", teash_puts, NULL },
+                    }
+    },
     { NULL, NULL, NULL }
 };
 
