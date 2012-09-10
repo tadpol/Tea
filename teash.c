@@ -50,14 +50,13 @@
  * --------------
  *
  * LP is the line pointer for executing the script.  When this is NULL, no
- * script is running.  Otherwise it points the the line being executed.
+ * script is running.  Otherwise it points the next line to run.
  *
  * RS and returnStack are a stack of line numbers used for gosub/return and
  * possibly other similar things. (looping)
  *
  * root is the commands that can be run
  *
- * retVal is the return value of the last executed command.
  */
 
 #define TEASH_LINE_MAX      80
@@ -70,7 +69,7 @@ struct teash_memory_s {
     char *script_end;
     char *dict_start;
     char *dict_end;
-    int32_t *vars; // '?','@','A'...'Z' look at ASCII/UTF8 map.
+    int32_t *vars; /* '?','@','A'...'Z' look at ASCII/UTF8 map. */
     char *mem_end;
 };
 #define teash_var2idx(v) ((v)-'?')
@@ -161,22 +160,7 @@ int teash_clear_script(int argc, char **argv, teash_state_t *teash)
 }
 
 /**
- * \brief Run the script.
- *
- * \note This is mostly equivalent to "goto 0". So we might drop it for space saving.
- */
-int teash_run_script(int argc, char **argv, teash_state_t *teash)
-{
-    if( teash->LP != NULL ) return -1; /* already running */
-
-    /* first line is three bytes in. */
-    teash->LP = teash->mem.mem_start + 2;
-
-    return 0;
-}
-
-/**
- * \brief Goto, Gosub, and Return all together since they're mostly the same
+ * \brief Goto, Gosub, Return, Run, and End all together since they're mostly the same
  *
  * This jumps to the next equal-or-greater line. (or to the end.)
  *
@@ -193,6 +177,9 @@ int teash_run_script(int argc, char **argv, teash_state_t *teash)
  * Return pops the return stack and goes to that line.  If the return stack 
  * is empty, return exits the script and goes to the command prompt.
  *
+ * Run resets the return stack and otherwise is identical to "goto 0"
+ *
+ * End stops the script
  */
 int teash_gojump(int argc, char **argv, teash_state_t *teash)
 {
@@ -202,7 +189,14 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
         ln = strtoul(argv[1], NULL, 0);
     }
 
-    if( argv[0][0] == 'r' ) { /* must be 'return' */
+    if( argv[0][0] == 'e' ) { /* called as 'End' */
+        ret = ln; /* argv[1] is actually return value */
+        teash->LP = NULL;
+        return ret;
+    } else if( argv[0][1] == 'u' ) { /* called as 'rUn' */
+        teash->RS = teash->returnStack; /* reset RS */
+        ln = 0;
+    } else if( argv[0][1] == 'e' ) { /* called as 'rEturn' */
         ret = ln; /* argv[1] is actually return value */
         if(teash->RS <= teash->returnStack) {
             return ret;
@@ -210,7 +204,7 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
             teash->RS--;
             ln = *(teash->RS);
         }
-    } else if(argv[0][2] == 's') { /* goSub, not goTo */
+    } else if(argv[0][2] == 's') { /* called as 'goSub' */
         if(teash->RS > &teash->returnStack[TEASH_RS_SIZE]) return -2; /* no return stack space left. */
         if(teash->LP) {
             /* LP is the next line to run, not current. */
@@ -791,7 +785,8 @@ uint8_t test_memory[4096];
 teash_state_t teash_state;
 teash_cmd_t teash_root_commands[] = {
     { "clear", teash_clear_script, NULL },
-    { "run", teash_run_script, NULL },
+    { "run", teash_gojump, NULL },
+    { "end", teash_gojump, NULL },
     { "goto", teash_gojump, NULL },
     { "gosub", teash_gojump, NULL },
     { "return", teash_gojump, NULL },
