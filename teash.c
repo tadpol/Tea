@@ -219,6 +219,7 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
 }
 
 /****************************************************************************/
+#if 0
 /**
  * \brief Evaluate a math expression and maybe save the result to a variable
  *
@@ -356,6 +357,69 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
 
     return acc;
 }
+#else
+/*
+ * Usage: let <val> [<op> <val>] [-> <var>]
+ * Where val is a number or var
+ * var is A-Z (and ?@)
+ * op is: + - * / % & | ^ > >= >> < <= << <> 
+ * -> stores result to var
+ */
+int teash_let(int argc, char **argv, teash_state_t *teash)
+{
+    int a=0, b=0;
+    if(argc == 1) return 0;
+
+    if(isdigit(argv[1][0])) {
+        a = strtol(argv[1], NULL, 0);
+    } else if(teash_isvar(argv[1][0])) {
+        a = teash->mem.vars[teash_var2idx(argv[1][0])];
+    }
+    if(argc < 4) return a;
+
+    if(isdigit(argv[3][0])) {
+        b = strtol(argv[3], NULL, 0);
+    } else if(teash_isvar(argv[3][0])) {
+        b = teash->mem.vars[teash_var2idx(argv[3][0])];
+    }
+    
+    switch(argv[2][0]) {
+        case '+': a += b; break;
+        case '-': a -= b; break;
+        case '*': a *= b; break;
+        case '/': a /= b; break;
+        case '%': a %= b; break;
+        case '&': a &= b; break;
+        case '|': a |= b; break;
+        case '^': a ^= b; break;
+        case '=': a= a==b; break;
+        case '>':
+            switch(argv[2][1]) {
+                case '>': a >>= b; break;
+                case '=': a = a>=b; break;
+                default: a = a>b; break;
+            }
+            break;
+        case '<':
+            switch(argv[2][1]) {
+                case '<': a <<= b; break;
+                case '=': a = a<=b; break;
+                case '>': a = a!=b; break;
+                default: a = a<b; break;
+            }
+            break;
+        default:
+            break;
+    }
+
+    if( strcmp("->", argv[argc-2]) == 0) { /* a store command */
+        if(teash_isvar(argv[argc-1][0])) {
+            teash->mem.vars[teash_var2idx(argv[argc-1][0])] = a;
+        }
+    }
+    return a;
+}
+#endif
 
 /****************************************************************************/
 
@@ -544,7 +608,7 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
                 if(ac == TEASH_CMD_DEPTH_MAX) return -2;
                 parents[ac++] = current;
                 current = current->sub;
-                continue; /* Does this skip the current++ ??  it MUST */
+                continue;
             }
         }
         current++;
@@ -560,6 +624,7 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
      * - The command "A B" is executed.
      * - So a depth search we find node B, but there are no commands there,
      *   so we need to backtrack to A.
+     *   XXX Why not just fail? Why even allow this?
      */
     for(ac--; ac > 0; ac--) {
         if( parents[ac]->cmd ) {
