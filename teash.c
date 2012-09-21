@@ -362,7 +362,7 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
  * Usage: let <val> [<op> <val>] [-> <var>]
  * Where val is a number or var
  * var is A-Z (and ?@)
- * op is: + - * / % & | ^ > >= >> < <= << <> 
+ * op is: + - * / % & | ^ > >= >> < <= << <> =
  * -> stores result to var
  */
 int teash_let(int argc, char **argv, teash_state_t *teash)
@@ -710,6 +710,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                     for(varlen=0;(isalnum(*in)||teash_isvar(*in)) && *in!='\0';
                             in++, varlen++) {}
                 }
+                in--;
                 /* Now look up variable */
                 if( varlen == 1 && teash_isvar(*varname) ) {
                     /* Number variable. grab it and ascii-fy it */
