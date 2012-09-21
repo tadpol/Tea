@@ -219,147 +219,11 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
 }
 
 /****************************************************************************/
-#if 0
 /**
  * \brief Evaluate a math expression and maybe save the result to a variable
  *
- * If the first param is just a variable, then the final result will get
- * saved there.
- *
- * This is a left associative accumilator style math parser. For simple one
- * operand expressions, it works just like infix notation.
- *
- * This parser has two numbers, the accumilator and the immeadiate.  The
- * accumilator is initialized to zero.  The immeadiate is the number that
- * was just parsed from the input.  There is one operand, and it is
- * replaced as new once appear in the input.  The initial operand sets the
- * accumilator to the immeadiate.  Once an immeadiate is parsed, the
- * current operand is used to combine it into the accumilator.
- *
- * Numbers are in base ten unless the start with 0x, then they are in base
- * sixteen.  The variables A thru Z can also be used (must be uppercase).
- *
- * This style of parser is simpler than a full infix, but cannot do very
- * complex equations, since there is no nesting.  LET might get upgraded
- * someday, or maybe I'll add a postfix notation along side for when more
- * powerful equation are needed.
- *
- * Some examples:
- * - Add four numbers: 1 + 2 3 4
- *   Or: + 1 2 3 4
- *   Both give 10
- * - Subtract: 10 - 5 3
- *   gives 2
- *   However: - 10 5 3
- *   gives -18 since the ACC starts with 0
- * - Multiply: 2 * 3
- */
-int teash_let(int argc, char **argv, teash_state_t *teash)
-{
-    char *p;
-    char set = '\0';
-    int acc=0;
-    int imd=0;
-    char op = '='; 
-
-    /* drop "let" */
-    argc--, argv++;
-
-    /* simplistic variable setting.  If first param is just a var, then we
-     * set to it.
-     * Not liking this; think about how to fix.
-     */
-    if( isalpha(argv[0][0]) && argv[0][1] == '\0' ) {
-        set = argv[0][0];
-        argc--, argv++;
-    }
-
-    /* process exressions */
-    for(; argc > 0; argc--, argv++) {
-        p = *argv;
-
-        /* Very simple, left associating math expressions. */
-        for(; *p != '\0'; ) {
-            for(; isspace(*p) && *p != '\0'; p++) {}
-
-            if( isalnum(*p) ) {
-                if( isdigit(*p) ) {
-                    imd = strtoul(p, &p, 0);
-                } else {
-                    imd = teash->mem.vars[teash_var2idx(*p)];
-                    p++;
-                }
-                switch(op) {
-                    case '=': acc = imd; break;
-                    case '+': acc += imd; break;
-                    case '-': acc -= imd; break;
-                    case '*': acc *= imd; break;
-                    case '/': acc /= imd; break;
-                    case '%': acc %= imd; break;
-                    case '&': acc &= imd; break;
-                    case '|': acc |= imd; break;
-                    case '^': acc ^= imd; break;
-                    case '>': acc = (acc > imd); break;
-                    case 'L': acc = (acc >= imd); break;
-                    case 'r': acc >>= imd; break;
-                    case '<': acc = (acc < imd); break;
-                    case 'G': acc = (acc <= imd); break;
-                    case 'l': acc <<= imd; break;
-                    case 'e': acc = (acc == imd); break;
-                }
-            } else {
-                switch(*p) {
-                    case '+':
-                    case '-':
-                    case '*': 
-                    case '/':
-                    case '%':
-                    case '&':
-                    case '|':
-                    case '^':
-                        op = *p;
-                        break;
-                    case '=':
-                        p++;
-                        switch(*p) {
-                            case '=': op = 'e'; break;
-                            default: p--; op = '='; break;
-                        }
-                        break;
-                    case '>':
-                        p++;
-                        switch(*p) {
-                            case '>': op = 'r'; break;
-                            case '=': op = 'L'; break;
-                            default: p--; op = '>'; break;
-                        }
-                        break;
-                    case '<':
-                        p++;
-                        switch(*p) {
-                            case '<': op = 'l'; break;
-                            case '=': op = 'G'; break;
-                            default: p--; op = '<'; break;
-                        }
-                        break;
-                    default:
-                        /* unknown symbol, skip it */
-                        break;
-                }
-                p++;
-            }
-        }
-    }
-
-    if(set != '\0') {
-        teash->mem.vars[teash_var2idx(set)] = acc;
-    }
-
-    return acc;
-}
-#else
-/*
  * Usage: let <val> [<op> <val>] [-> <var>]
+ *
  * Where val is a number or var
  * var is A-Z (and ?@)
  * op is: + - * / % & | ^ > >= >> < <= << <> =
@@ -419,14 +283,13 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
     }
     return a;
 }
-#endif
 
 /****************************************************************************/
 
 /**
  * \brief Skip the next line if not zero
  *
- * \note "skip A" won't do what you might think.  should fix.
+ * This passes all of its args to let, and uses that result.
  */
 int teash_skip(int argc, char **argv, teash_state_t *teash)
 {
