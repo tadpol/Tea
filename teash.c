@@ -562,6 +562,13 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
             in++;
             if( *in == '$' ) {
                 *out = '$';
+#if 1
+            } else if( teash_isvar(*in) ) {
+                /* Number variable. grab it and ascii-fy it */
+                out = teash_itoa(teash->mem.vars[teash_var2idx(*in)], out, oute-out);
+                out--;
+            }
+#else
             } else {
                 /* Find the var name in the buffer */
                 varname = in;
@@ -587,6 +594,7 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
                     /* Variable not found, replace with nothing */
                 }
             }
+#endif
         }
     }
 
