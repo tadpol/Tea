@@ -241,41 +241,42 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
     }
     if(argc < 4) return a;
 
-    if(isdigit(argv[3][0])) {
-        b = strtol(argv[3], NULL, 0);
-    } else if(teash_isvar(argv[3][0])) {
-        b = teash->mem.vars[teash_var2idx(argv[3][0])];
-    }
-    
-    switch(argv[2][0]) {
-        case '+': a += b; break;
-        case '-': a -= b; break;
-        case '*': a *= b; break;
-        case '/': a /= b; break;
-        case '%': a %= b; break;
-        case '&': a &= b; break;
-        case '|': a |= b; break;
-        case '^': a ^= b; break;
-        case '=': a= a==b; break;
-        case '>':
-            switch(argv[2][1]) {
-                case '>': a >>= b; break;
-                case '=': a = a>=b; break;
-                default: a = a>b; break;
-            }
-            break;
-        case '<':
-            switch(argv[2][1]) {
-                case '<': a <<= b; break;
-                case '=': a = a<=b; break;
-                case '>': a = a!=b; break;
-                default: a = a<b; break;
-            }
-            break;
-        default:
-            break;
-    }
+    if(strcmp("->",argv[2])!=0) {
+        if(isdigit(argv[3][0])) {
+            b = strtol(argv[3], NULL, 0);
+        } else if(teash_isvar(argv[3][0])) {
+            b = teash->mem.vars[teash_var2idx(argv[3][0])];
+        }
 
+        switch(argv[2][0]) {
+            case '+': a += b; break;
+            case '-': a -= b; break;
+            case '*': a *= b; break;
+            case '/': a /= b; break;
+            case '%': a %= b; break;
+            case '&': a &= b; break;
+            case '|': a |= b; break;
+            case '^': a ^= b; break;
+            case '=': a= a==b; break;
+            case '>':
+                switch(argv[2][1]) {
+                  case '>': a >>= b; break;
+                  case '=': a = a>=b; break;
+                  default: a = a>b; break;
+                }
+                break;
+            case '<':
+                switch(argv[2][1]) {
+                    case '<': a <<= b; break;
+                    case '=': a = a<=b; break;
+                    case '>': a = a!=b; break;
+                    default: a = a<b; break;
+                }
+                break;
+            default:
+                break;
+        }
+    }
     if( strcmp("->", argv[argc-2]) == 0) { /* a store command */
         if(teash_isvar(argv[argc-1][0])) {
             teash->mem.vars[teash_var2idx(argv[argc-1][0])] = a;
@@ -550,8 +551,6 @@ char* teash_itoa(int i, char *b, unsigned max)
  */
 int teash_subst(char *in, char *out, teash_state_t *teash)
 {
-    char *varname;
-    int varlen;
     char *oute = out+TEASH_LINE_MAX;
 
     /* Look for variables (they start with $) */
@@ -570,6 +569,8 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
             }
 #else
             } else {
+                char *varname;
+                int varlen;
                 /* Find the var name in the buffer */
                 varname = in;
                 if( *in =='{' ) {
