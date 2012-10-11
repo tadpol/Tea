@@ -61,7 +61,6 @@
 
 #define TEASH_LINE_MAX      80
 #define TEASH_PARAM_MAX     10
-#define TEASH_CMD_DEPTH_MAX 10
 #define TEASH_RS_SIZE       10
 
 struct teash_memory_s {
@@ -106,8 +105,7 @@ int teash_clear_script(int argc, char **argv, teash_state_t *teash);
 int teash_run_script(int argc, char **argv, teash_state_t *teash);
 int teash_goto(int argc, char **argv, teash_state_t *teash);
 int teash_gojump(int argc, char **argv, teash_state_t *teash);
-int teash_let(int argc, char **argv, teash_state_t *teash);
-int teash_skip(int argc, char **argv, teash_state_t *teash);
+int teash_skiplet(int argc, char **argv, teash_state_t *teash);
 int teash_list(int argc, char **argv, teash_state_t *teash);
 int teash_puts(int argc, char **argv, teash_state_t *teash);
 
@@ -440,7 +438,6 @@ int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
 int teash_exec(int argc, char **argv, teash_state_t *teash)
 {
     int ac = 0;
-    teash_cmd_t *parents[TEASH_CMD_DEPTH_MAX];
     teash_cmd_t *current = teash->root;
 
     /* params passed must include command name as argv[0].
@@ -458,31 +455,11 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
                 break;
             } else {
                 /* try going deeper. */
-                if(ac == TEASH_CMD_DEPTH_MAX) return -2;
-                parents[ac++] = current;
                 current = current->sub;
                 continue;
             }
         }
         current++;
-    }
-
-    /* No command to call at deepest find, backtrack up to see if we missed
-     * one.
-     *
-     * This is to handle the following:
-     * - Have tree with commands defined at the following points:
-     *   A
-     *   A B C
-     * - The command "A B" is executed.
-     * - So a depth search we find node B, but there are no commands there,
-     *   so we need to backtrack to A.
-     *   XXX Why not just fail? Why even allow this?
-     */
-    for(ac--; ac > 0; ac--) {
-        if( parents[ac]->cmd ) {
-            return parents[ac]->cmd((argc-ac), &argv[ac], teash);
-        }
     }
 
     /* No commands anywhere to run what was requested. */
