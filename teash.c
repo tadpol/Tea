@@ -228,8 +228,11 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
  * var is A-Z (and ?@)
  * op is: + - * / % & | ^ > >= >> < <= << <> =
  * -> stores result to var
+ *
+ * If called as 'let' just does the math.
+ * If called as 'skip' and result is not 0, then skips next line in script.
  */
-int teash_let(int argc, char **argv, teash_state_t *teash)
+int teash_skiplet(int argc, char **argv, teash_state_t *teash)
 {
     int a=0, b=0;
     if(argc == 1) return 0;
@@ -282,28 +285,14 @@ int teash_let(int argc, char **argv, teash_state_t *teash)
             teash->mem.vars[teash_var2idx(argv[argc-1][0])] = a;
         }
     }
+    /* if called as skip, and result is not 0, then skip */
+    if(argv[0][0] == 's' && a != 0 && teash->LP != NULL) {
+        teash_next_line(teash);
+    }
     return a;
 }
 
 /****************************************************************************/
-
-/**
- * \brief Skip the next line if not zero
- *
- * This passes all of its args to let, and uses that result.
- */
-int teash_skip(int argc, char **argv, teash_state_t *teash)
-{
-    if( argc < 2 ) return -1;
-    if( teash_let(argc, argv, teash) == 0 ) return 0;
-
-    if( teash->LP == NULL ) return 0;
-
-    /* Jump to next line */
-    teash_next_line(teash);
-
-    return 0;
-}
 
 /**
  * \brief List what is in the script space.
@@ -727,8 +716,8 @@ teash_cmd_t teash_root_commands[] = {
     { "goto", teash_gojump, NULL },
     { "gosub", teash_gojump, NULL },
     { "return", teash_gojump, NULL },
-    { "let", teash_let, NULL },
-    { "skip", teash_skip, NULL },
+    { "let", teash_skiplet, NULL },
+    { "skip", teash_skiplet, NULL },
     { "list", teash_list, NULL },
     { "puts", teash_puts, NULL },
     { "deep", NULL, (teash_cmd_t[]){
