@@ -240,7 +240,7 @@ int teash_skiplet(int argc, char **argv, teash_state_t *teash)
     } else if(teash_isvar(argv[1][0])) {
         a = teash->mem.vars[teash_var2idx(argv[1][0])];
     }
-    if(argc < 4) return a;
+    if(argc < 4) goto checkskip;
 
     if(strcmp("->",argv[2])!=0) {
         if(isdigit(argv[3][0])) {
@@ -283,6 +283,7 @@ int teash_skiplet(int argc, char **argv, teash_state_t *teash)
             teash->mem.vars[teash_var2idx(argv[argc-1][0])] = a;
         }
     }
+checkskip:
     /* if called as skip, and result is not 0, then skip */
     if(argv[0][0] == 's' && a != 0 && teash->LP != NULL) {
         teash_next_line(teash);
