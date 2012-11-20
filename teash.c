@@ -516,6 +516,7 @@ char* teash_itoa(int i, char *b, unsigned max)
  * XXX This behavor needs to be cleaned up.
  *
  */
+#if 1
 int teash_subst(char *in, char *out, teash_state_t *teash)
 {
     char *oute = out+TEASH_LINE_MAX;
@@ -569,6 +570,35 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
     *out = '\0';
     return 0;
 }
+#else
+int teash_subst_backsliding(char *b, char *be, teash_state_t *teash)
+{
+    /* First slide buffer to back */
+    unsigned l = be-(b+strlen(b));
+    memmove(b+l, b, l);
+
+    char *in = b+l;
+
+    /* Now work over as if two buffers. */
+    for(; *in != '\0' && b < in; in++, b++) {
+        if( *in != '$' ) {
+            *b = *in;
+        } else {
+            in++;
+            if( *in == '$' ) {
+                *b = '$';
+            } else if( teash_isvar(*in) ) {
+                /* Number variable. grab it and ascii-fy it */
+                b = teash_itoa(teash->mem.vars[teash_var2idx(*in)], b, in-b);
+                b--;
+            }
+        }
+    }
+
+    *b = '\0';
+    return 0;
+}
+#endif
 
 /**
  * \brief take a line, do subs, and break it into params.
