@@ -102,8 +102,6 @@ struct teash_state_s {
 
 /* Function Prototypes */
 int teash_clear_script(int argc, char **argv, teash_state_t *teash);
-int teash_run_script(int argc, char **argv, teash_state_t *teash);
-int teash_goto(int argc, char **argv, teash_state_t *teash);
 int teash_gojump(int argc, char **argv, teash_state_t *teash);
 int teash_skiplet(int argc, char **argv, teash_state_t *teash);
 int teash_list(int argc, char **argv, teash_state_t *teash);
@@ -218,6 +216,47 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
 
 /****************************************************************************/
 /**
+ * \brief Get a number from a string with a few prefixes
+ * \param[in] pointer to string to parse
+ *
+ * Parses a number with optional prefix modifier.  The number is either in
+ * decimal or hex, starting with '0x'.  The prefix is '@', '-', or '~'.
+ * 
+ * '~' is binary inverse. '-' is negative. '@' is memory dereference. For '@'
+ * the number becomes a memoery address and reads an integer from that
+ * location.  This could cause unaligned failures if you are not careful.
+ *
+ * \note No indication of parse failures.
+ *
+ * \retval Number parsed.
+ */
+long teash_strtol(char *s)
+{
+    long r;
+    int post = 0;
+
+    if(*s == '@') {
+        post = 1;
+        s++;
+    } else if(*s=='-') {
+        post = 2;
+        s++;
+    } else if(*s=='~') {
+        post = 3;
+        s++;
+    }
+    r = strtol(s, NULL, 0);
+    if(post == 3) {
+        r = ~ r;
+    } else if(post == 2) {
+        r = - r;
+    } else if(post == 1) {
+        r = *((int*)r);
+    }
+    return r;
+}
+
+/**
  * \brief Evaluate a math expression and maybe save the result to a variable
  *
  * Usage: let <val> [<op> <val>] [-> <var>]
@@ -235,18 +274,18 @@ int teash_skiplet(int argc, char **argv, teash_state_t *teash)
     int a=0, b=0;
     if(argc == 1) return 0;
 
-    if(isdigit(argv[1][0])) {
-        a = strtol(argv[1], NULL, 0);
-    } else if(teash_isvar(argv[1][0])) {
+    if(teash_isvar(argv[1][0])) {
         a = teash->mem.vars[teash_var2idx(argv[1][0])];
+    } else {
+        a = teash_strtol(argv[1]);
     }
     if(argc < 4) goto checkskip;
 
     if(strcmp("->",argv[2])!=0) {
-        if(isdigit(argv[3][0])) {
-            b = strtol(argv[3], NULL, 0);
-        } else if(teash_isvar(argv[3][0])) {
+        if(teash_isvar(argv[3][0])) {
             b = teash->mem.vars[teash_var2idx(argv[3][0])];
+        } else {
+            b = teash_strtol(argv[3]);
         }
 
         switch(argv[2][0]) {
