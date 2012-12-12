@@ -18,25 +18,15 @@
  *
  * Inital savable memory layout:
  *  - Script space, grows up
- *  - Dictionary space, grows down
  *  - Fixed vars
- * Gives us the following pointers:
- * - teash_mem_start    : fixed
- * - teash_script_end   : moving
- * - teash_dict_start   : moving
- * - teash_dict_end     : fixed
- * - teash_num_vars     : fixed
- * - teash_mem_end      : fixed
  *
- * Free memory is (teash_dict_start - teash_sript_end)
+ * Free memory is the space between the end of the script and the first
+ * variable.
  *
  * The script space is a series of lines.  Each line is two bytes BigE for
  * the line number. Some number of bytes for the line code, then a NUL
  * byte. As many lines as will fit is allowed.  Line numbers should always
  * be in increasing order.
- *
- * The dictionary is a bunch of key-value stings.  Primarily lets you save
- * strings for later use.
  *
  * Number Variables are 28 variables ?@A-Z. They are raw signed integers
  * (rather than the ascii version of them).
@@ -66,10 +56,7 @@
 struct teash_memory_s {
     char *mem_start;
     char *script_end;
-    char *dict_start;
-    char *dict_end;
     int32_t *vars; /* '?','@','A'...'Z' look at ASCII/UTF8 map. */
-    char *mem_end;
 };
 #define teash_var2idx(v) ((v)-'?')
 #define TEASH_VAR_COUNT ('Z'-'?'+1)
@@ -98,7 +85,7 @@ struct teash_state_s {
 /**
  * \breif How many bytes left for script or dict?
  */
-#define teash_has_free(teash) ((teash)->mem.dict_start - (teash)->mem.script_end)
+#define teash_has_free(teash) ((char*)((teash)->mem.vars) - (teash)->mem.script_end)
 
 /* Function Prototypes */
 int teash_clear_script(int argc, char **argv);
@@ -137,19 +124,19 @@ teash_state_t* teash_get_state(void);
  */
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem)
 {
+    char *mem_end;
+
     /* script and dict are byte addressed, so no alignment needed */
     mem->mem_start = (char*)memory;
     /* vars need to be 32bit aligned, so line up the end and stay inside. */
-    mem->mem_end = (char*)(((ptrdiff_t)memory+size) & ~0x3);
+    mem_end = (char*)(((ptrdiff_t)memory+size) & ~0x3);
 
     /* check if too small */
     if( size <= (sizeof(uint32_t)*TEASH_VAR_COUNT) + (sizeof(uint16_t)*2) + 10 )
         return -1;
 
     mem->script_end = mem->mem_start;
-    mem->vars = (int32_t*)(mem->mem_end - sizeof(int32_t)*TEASH_VAR_COUNT);
-    mem->dict_end = (char*)mem->vars;
-    mem->dict_start = mem->dict_end;
+    mem->vars = (int32_t*)(mem_end - sizeof(int32_t)*TEASH_VAR_COUNT);
 
     return 0;
 }
@@ -687,7 +674,7 @@ int teash_load_or_eval(char *line)
 int teash_mloop(void)
 {
     teash_state_t *teash = teash_get_state();
-    char line[TEASH_LINE_MAX+1]; // could move into state.
+    char line[TEASH_LINE_MAX+1];
 
     /* initialize remaining state vars */
     teash->LP = NULL;
