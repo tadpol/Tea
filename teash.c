@@ -76,7 +76,7 @@ struct teash_memory_s {
 #define teash_isvar(v) ((v) >= '?' && (v) <= 'Z')
 
 typedef struct teash_state_s teash_state_t;
-typedef int(*teash_f)(int,char**,teash_state_t*);
+typedef int(*teash_f)(int,char**);
 
 typedef struct teash_cmd_s teash_cmd_t;
 struct teash_cmd_s {
@@ -101,22 +101,33 @@ struct teash_state_s {
 #define teash_has_free(teash) ((teash)->mem.dict_start - (teash)->mem.script_end)
 
 /* Function Prototypes */
-int teash_clear_script(int argc, char **argv, teash_state_t *teash);
-int teash_gojump(int argc, char **argv, teash_state_t *teash);
-int teash_skiplet(int argc, char **argv, teash_state_t *teash);
-int teash_list(int argc, char **argv, teash_state_t *teash);
-int teash_puts(int argc, char **argv, teash_state_t *teash);
+int teash_clear_script(int argc, char **argv);
+int teash_gojump(int argc, char **argv);
+int teash_skiplet(int argc, char **argv);
+int teash_list(int argc, char **argv);
+int teash_puts(int argc, char **argv);
 
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem);
-void teash_goto_line(uint16_t ln, teash_state_t *teash);
-void teash_next_line(teash_state_t *teash);
-int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash);
-int teash_exec(int argc, char **argv, teash_state_t *teash);
-int teash_subst(char *in, char *out, teash_state_t *teash);
-int teash_eval(char *line, teash_state_t *teash);
-int teash_do_line(char *line, teash_state_t *teash);
-int teash_mloop(teash_state_t *teash);
+void teash_goto_line(uint16_t ln);
+void teash_next_line(void);
+int teash_load_line(uint16_t ln, char *newline);
+int teash_exec(int argc, char **argv);
+int teash_subst(char *in, char *out);
+int teash_eval(char *line);
+int teash_do_line(char *line);
+int teash_mloop(void);
 
+/**
+ * \brief Get the current teash state
+ *
+ * If you have a need to run multiple independent teashes, this is where 
+ * you figure out which one to use.  This assumes that there is some
+ * outside knowledge that can be applied.  For example, many threading 
+ * systems have a thread local storage area.
+ *
+ * \returns The current teash state.
+ */
+teash_state_t* teash_get_state(void);
 
 /* stuff above here will get moved to a header file someday */
 /*****************************************************************************/
@@ -149,8 +160,9 @@ int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem
  *
  * \note doesn't actually erase anything, just moves the end.
  */
-int teash_clear_script(int argc, char **argv, teash_state_t *teash)
+int teash_clear_script(int argc, char **argv)
 {
+    teash_state_t *teash = teash_get_state();
     teash->mem.script_end = teash->mem.mem_start;
     return 0;
 }
@@ -177,8 +189,9 @@ int teash_clear_script(int argc, char **argv, teash_state_t *teash)
  *
  * End stops the script
  */
-int teash_gojump(int argc, char **argv, teash_state_t *teash)
+int teash_gojump(int argc, char **argv)
 {
+    teash_state_t *teash = teash_get_state();
     int ln = 0;
     int ret = 0;
     if(argc > 1) {
@@ -210,7 +223,7 @@ int teash_gojump(int argc, char **argv, teash_state_t *teash)
     }
     /* else is goto. */
 
-    teash_goto_line(ln, teash);
+    teash_goto_line(ln);
     return ret;
 }
 
@@ -269,8 +282,9 @@ long teash_strtol(char *s)
  * If called as 'let' just does the math.
  * If called as 'skip' and result is not 0, then skips next line in script.
  */
-int teash_skiplet(int argc, char **argv, teash_state_t *teash)
+int teash_skiplet(int argc, char **argv)
 {
+    teash_state_t *teash = teash_get_state();
     int a=0, b=0;
     if(argc == 1) return 0;
 
@@ -325,7 +339,7 @@ int teash_skiplet(int argc, char **argv, teash_state_t *teash)
 checkskip:
     /* if called as skip, and result is not 0, then skip */
     if(argv[0][0] == 's' && a != 0 && teash->LP != NULL) {
-        teash_next_line(teash);
+        teash_next_line();
     }
     return a;
 }
@@ -335,8 +349,9 @@ checkskip:
 /**
  * \brief List what is in the script space.
  */
-int teash_list(int argc, char **argv, teash_state_t *teash)
+int teash_list(int argc, char **argv)
 {
+    teash_state_t *teash = teash_get_state();
     char *p;
     uint16_t ln;
     for(p = teash->mem.mem_start; p < teash->mem.script_end; ) {
@@ -352,7 +367,7 @@ int teash_list(int argc, char **argv, teash_state_t *teash)
 /**
  * \brief Print the rest of the line to stdout
  */
-int teash_puts(int argc, char **argv, teash_state_t *teash)
+int teash_puts(int argc, char **argv)
 {
     argc--, argv++;
     for(; argc > 0; argc--, argv++) {
@@ -371,8 +386,9 @@ int teash_puts(int argc, char **argv, teash_state_t *teash)
  * lines 20 and 25 exist, will return line 25.
  *
  */
-void teash_goto_line(uint16_t ln, teash_state_t *teash)
+void teash_goto_line(uint16_t ln)
 {
+    teash_state_t *teash = teash_get_state();
     char *p = teash->mem.mem_start;
     uint16_t tln;
 
@@ -396,8 +412,9 @@ void teash_goto_line(uint16_t ln, teash_state_t *teash)
 /**
  * \brief Jump to the next line in the script.
  */
-void teash_next_line(teash_state_t *teash)
+void teash_next_line(void)
 {
+    teash_state_t *teash = teash_get_state();
     teash->LP += strlen(teash->LP) + 3;
     if( teash->LP >= teash->mem.script_end)
         teash->LP = NULL;
@@ -409,8 +426,9 @@ void teash_next_line(teash_state_t *teash)
  * This keeps the script space sorted by line number. Inserting and replacing
  * as needed.
  */
-int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
+int teash_load_line(uint16_t ln, char *newline)
 {
+    teash_state_t *teash = teash_get_state();
     char *oldline = NULL;
     uint16_t tln;
     int oldlen=0;
@@ -475,8 +493,9 @@ int teash_load_line(uint16_t ln, char *newline, teash_state_t *teash)
 /**
  * \breif Search for a command, and call it when found.
  */
-int teash_exec(int argc, char **argv, teash_state_t *teash)
+int teash_exec(int argc, char **argv)
 {
+    teash_state_t *teash = teash_get_state();
     int ac = 0;
     teash_cmd_t *current = teash->root;
 
@@ -490,7 +509,7 @@ int teash_exec(int argc, char **argv, teash_state_t *teash)
             if( current->sub == NULL || (argc-ac) == 1) {
                 /* Cannot go deeper, try to call */
                 if( current->cmd ) {
-                    return current->cmd((argc-ac), &argv[ac], teash);
+                    return current->cmd((argc-ac), &argv[ac]);
                 }
                 break;
             } else {
@@ -556,8 +575,9 @@ char* teash_itoa(int i, char *b, unsigned max)
  *
  */
 #if 1
-int teash_subst(char *in, char *out, teash_state_t *teash)
+int teash_subst(char *in, char *out)
 {
+    teash_state_t *teash = teash_get_state();
     char *oute = out+TEASH_LINE_MAX;
 
     /* Look for variables (they start with $) */
@@ -610,8 +630,9 @@ int teash_subst(char *in, char *out, teash_state_t *teash)
     return 0;
 }
 #else
-int teash_subst_backsliding(char *b, char *be, teash_state_t *teash)
+int teash_subst_backsliding(char *b, char *be)
 {
+    teash_state_t *teash = teash_get_state();
     /* First slide buffer to back */
     unsigned l = be-(b+strlen(b));
     memmove(b+l, b, l);
@@ -645,8 +666,9 @@ int teash_subst_backsliding(char *b, char *be, teash_state_t *teash)
  * This assumes that #line is read only, and so copies the line into a
  * buffer that can be modified.
  */
-int teash_eval(char *line, teash_state_t *teash)
+int teash_eval(char *line)
 {
+    teash_state_t *teash = teash_get_state();
     char buf[TEASH_LINE_MAX+1]; // could move into state.
     char *argv[TEASH_PARAM_MAX+1]; // could move into state.
     char *p;
@@ -654,7 +676,7 @@ int teash_eval(char *line, teash_state_t *teash)
     int argc;
 
     /* do substitutions */
-    teash_subst(line, buf, teash);
+    teash_subst(line, buf);
 
     /* Break up into parameters */
     for(argc=0, p=buf; *p != '\0'; p++) {
@@ -688,7 +710,7 @@ int teash_eval(char *line, teash_state_t *teash)
         *p = '\0';
     }
 
-    return (teash->mem.vars[teash_var2idx('?')] = teash_exec(argc, argv, teash));
+    return (teash->mem.vars[teash_var2idx('?')] = teash_exec(argc, argv));
 }
 
 /** 
@@ -696,7 +718,7 @@ int teash_eval(char *line, teash_state_t *teash)
  *
  * Lines are ether executed or loaded into script memory.
  */
-int teash_do_line(char *line, teash_state_t *teash)
+int teash_do_line(char *line)
 {
     char *p;
     int ln;
@@ -717,13 +739,14 @@ int teash_do_line(char *line, teash_state_t *teash)
     }
     if( isspace(*p) || *p == '\0' ) {
         for(; isspace(*p) && *p != '\0'; p++) {}
-        return teash_load_line(ln, p, teash);
+        return teash_load_line(ln, p);
     }
-    return teash_eval(line, teash);
+    return teash_eval(line);
 }
 
-int teash_mloop(teash_state_t *teash)
+int teash_mloop(void)
 {
+    teash_state_t *teash = teash_get_state();
     char line[TEASH_LINE_MAX+1]; // could move into state.
 
     /* initialize remaining state vars */
@@ -735,16 +758,16 @@ int teash_mloop(teash_state_t *teash)
             printf("> ");
             fflush(stdout);
             if(!fgets(line, sizeof(line), stdin)) break;
-            teash_do_line(line, teash);
+            teash_do_line(line);
         } else {
             strncpy(line, teash->LP, TEASH_LINE_MAX);
             line[TEASH_LINE_MAX] = '\0';
 
             /* Set up LP for the next line after this one */
-            teash_next_line(teash);
+            teash_next_line();
 
             /* eval this line */
-            teash_eval(line, teash);
+            teash_eval(line);
 
         }
     }
@@ -776,12 +799,18 @@ teash_cmd_t teash_root_commands[] = {
     { NULL, NULL, NULL }
 };
 
+teash_state_t* teash_get_state(void)
+{
+    return &teash_state;
+}
+
+
 int main(int argc, char **argv)
 {
     teash_init_memory(test_memory, sizeof(test_memory), &teash_state.mem);
     teash_state.root = teash_root_commands;
 
-    return teash_mloop(&teash_state);
+    return teash_mloop();
 }
 #endif
 
