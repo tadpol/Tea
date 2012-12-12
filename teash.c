@@ -658,7 +658,7 @@ int teash_eval(char *line)
  *
  * Lines are ether executed or loaded into script memory.
  */
-int teash_do_line(char *line)
+int teash_load_or_eval(char *line)
 {
     char *p;
     int ln;
@@ -698,7 +698,7 @@ int teash_mloop(void)
             printf("> ");
             fflush(stdout);
             if(!fgets(line, sizeof(line), stdin)) break;
-            teash_do_line(line);
+            teash_load_or_eval(line);
         } else {
             strncpy(line, teash->LP, TEASH_LINE_MAX);
             line[TEASH_LINE_MAX] = '\0';
