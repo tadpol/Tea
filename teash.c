@@ -574,63 +574,7 @@ char* teash_itoa(int i, char *b, unsigned max)
  * XXX This behavor needs to be cleaned up.
  *
  */
-#if 1
-int teash_subst(char *in, char *out)
-{
-    teash_state_t *teash = teash_get_state();
-    char *oute = out+TEASH_LINE_MAX;
-
-    /* Look for variables (they start with $) */
-    for(; *in != '\0'; in++, out++) {
-        if( *in != '$' ) {
-            *out = *in;
-        } else {
-            in++;
-            if( *in == '$' ) {
-                *out = '$';
-#if 1
-            } else if( teash_isvar(*in) ) {
-                /* Number variable. grab it and ascii-fy it */
-                out = teash_itoa(teash->mem.vars[teash_var2idx(*in)], out, oute-out);
-                out--;
-            }
-#else
-            } else {
-                char *varname;
-                int varlen;
-                /* Find the var name in the buffer */
-                varname = in;
-                if( *in =='{' ) {
-                    varname++;
-                    in++;
-                    for(varlen=0; *in != '}' && *in != '\0'; in++, varlen++) {}
-                } else {
-                    for(varlen=0;(isalnum(*in)||teash_isvar(*in)) && *in!='\0';
-                            in++, varlen++) {}
-                }
-                in--;
-                /* Now look up variable */
-                if( varlen == 1 && teash_isvar(*varname) ) {
-                    /* Number variable. grab it and ascii-fy it */
-                    out = teash_itoa(teash->mem.vars[teash_var2idx(*varname)], out, oute-out);
-                    out--;
-#if 0
-                } else if( dict ) {
-                    /* Is it in the dictionary? */
-#endif
-                } else {
-                    /* Variable not found, replace with nothing */
-                }
-            }
-#endif
-        }
-    }
-
-    *out = '\0';
-    return 0;
-}
-#else
-int teash_subst_backsliding(char *b, char *be)
+int teash_subst(char *b, char *be)
 {
     teash_state_t *teash = teash_get_state();
     /* First slide buffer to back */
@@ -658,28 +602,24 @@ int teash_subst_backsliding(char *b, char *be)
     *b = '\0';
     return 0;
 }
-#endif
 
 /**
  * \brief take a line, do subs, and break it into params.
- *
- * This assumes that #line is read only, and so copies the line into a
- * buffer that can be modified.
+ * \param[in,out] line The string to parse. This is modified heavily.
  */
 int teash_eval(char *line)
 {
     teash_state_t *teash = teash_get_state();
-    char buf[TEASH_LINE_MAX+1]; // could move into state.
-    char *argv[TEASH_PARAM_MAX+1]; // could move into state.
+    char *argv[TEASH_PARAM_MAX+1];
     char *p;
     char *end=NULL;
     int argc;
 
     /* do substitutions */
-    teash_subst(line, buf);
+    teash_subst(line, line+TEASH_LINE_MAX);
 
     /* Break up into parameters */
-    for(argc=0, p=buf; *p != '\0'; p++) {
+    for(argc=0, p=line; *p != '\0'; p++) {
         /* skip white space */
         for(; isspace(*p) && *p != '\0'; p++) {}
         if( *p == '\0' ) break;
