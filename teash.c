@@ -49,9 +49,9 @@
  *
  */
 
-#define TEASH_LINE_MAX      80
-#define TEASH_PARAM_MAX     10
-#define TEASH_RS_SIZE       10
+#define TEASH_LINE_MAX      80  /*!< Maximum characters allowed in one line */
+#define TEASH_PARAM_MAX     10  /*!< Maximum parameters a command can have */
+#define TEASH_RS_SIZE       10  /*!< Maximum depth of nested gosubs */
 
 struct teash_memory_s {
     char *mem_start;
