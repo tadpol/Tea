@@ -58,9 +58,7 @@ struct teash_memory_s {
     char *script_end;
     int32_t *vars; /* '?','@','A'...'Z' look at ASCII/UTF8 map. */
 };
-#define teash_var2idx(v) ((v)-'?')
 #define TEASH_VAR_COUNT ('Z'-'?'+1)
-#define teash_isvar(v) ((v) >= '?' && (v) <= 'Z')
 
 typedef struct teash_state_s teash_state_t;
 typedef int(*teash_f)(int,char**);
@@ -81,9 +79,47 @@ struct teash_state_s {
     uint16_t *RS;
 };
 
+/**
+ * \brief Convert a variable name into an array index
+ * \param[in] v Variable name
+ *
+ * Usually you will want to use teash_get_var() and teash_set_var() instead
+ * of trying to use this and direct mapping into the array.
+ *
+ * \returns index into variable array
+ */
+#define teash_var2idx(v) ((v)-'?')
+
+/**
+ * \brief Test if a character is a Teash variable
+ * \param[in] v Variable character to test
+ *
+ * \returns True or False if character is a variable name
+ */
+#define teash_isvar(v) ((v) >= '?' && (v) <= 'Z')
+
+/**
+ * \brief Get a variable
+ * \param[in] ts teash_state_t
+ * \param[in] vn Variable to get
+ * \returns int32_t value of the variable
+ */
+#define teash_get_var(ts,vn) ((ts)->mem.vars[teash_var2idx(vn)])
+
+/**
+ * \brief Set a variable
+ * \param[in] ts teash_state_t
+ * \param[in] vn Variable to get
+ * \param[in] vl Value to set variable to
+ *
+ * \returns int32_t value of the variable
+ */
+#define teash_set_var(ts,vn,vl) (ts)->mem.vars[teash_var2idx(vn)] = (int32_t)(vl)
 
 /**
  * \breif How many bytes left for script or dict?
+ * \param[in] teash teash_state_t
+ * \returns number of bytes free
  */
 #define teash_has_free(teash) ((char*)((teash)->mem.vars) - (teash)->mem.script_end)
 
@@ -235,7 +271,7 @@ long teash_strtol(char *s)
     long r;
     int post = 0;
 
-    if(*s == '@') {
+    if(*s == '@') { /* XXX maybe broken. colliding with the variable of same name. */
         post = 1;
         s++;
     } else if(*s=='-') {
@@ -276,7 +312,7 @@ int teash_skiplet(int argc, char **argv)
     if(argc == 1) return 0;
 
     if(teash_isvar(argv[1][0])) {
-        a = teash->mem.vars[teash_var2idx(argv[1][0])];
+        a = teash_get_var(teash, argv[1][0]);
     } else {
         a = teash_strtol(argv[1]);
     }
@@ -284,7 +320,7 @@ int teash_skiplet(int argc, char **argv)
 
     if(strcmp("->",argv[2])!=0) {
         if(teash_isvar(argv[3][0])) {
-            b = teash->mem.vars[teash_var2idx(argv[3][0])];
+            b = teash_get_var(teash, argv[3][0]);
         } else {
             b = teash_strtol(argv[3]);
         }
@@ -320,7 +356,7 @@ int teash_skiplet(int argc, char **argv)
     }
     if( strcmp("->", argv[argc-2]) == 0) { /* a store command */
         if(teash_isvar(argv[argc-1][0])) {
-            teash->mem.vars[teash_var2idx(argv[argc-1][0])] = a;
+            teash_set_var(teash, argv[argc-1][0], a);
         }
     }
 checkskip:
@@ -580,7 +616,7 @@ int teash_subst(char *b, char *be)
                 *b = '$';
             } else if( teash_isvar(*in) ) {
                 /* Number variable. grab it and ascii-fy it */
-                b = teash_itoa(teash->mem.vars[teash_var2idx(*in)], b, in-b);
+                b = teash_itoa(teash_get_var(teash, *in), b, in-b);
                 b--;
             }
         }
@@ -637,7 +673,7 @@ int teash_eval(char *line)
         *p = '\0';
     }
 
-    return (teash->mem.vars[teash_var2idx('?')] = teash_exec(argc, argv));
+    return teash_set_var(teash, '?', teash_exec(argc, argv));
 }
 
 /** 
