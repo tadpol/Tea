@@ -123,13 +123,14 @@ struct teash_state_s {
  */
 #define teash_has_free(teash) ((char*)((teash)->mem.vars) - (teash)->mem.script_end)
 
-/* Function Prototypes */
+/* Teash Command Function Prototypes */
 int teash_clear_script(int argc, char **argv);
 int teash_gojump(int argc, char **argv);
 int teash_skiplet(int argc, char **argv);
 int teash_list(int argc, char **argv);
 int teash_puts(int argc, char **argv);
 
+/* Internal works Function Prototypes */
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem);
 void teash_goto_line(uint16_t ln);
 void teash_next_line(void);
@@ -137,7 +138,6 @@ int teash_load_line(uint16_t ln, char *newline);
 int teash_exec(int argc, char **argv);
 int teash_subst(char *in, char *out);
 int teash_eval(char *line);
-int teash_do_line(char *line);
 int teash_mloop(void);
 
 /**
@@ -255,41 +255,54 @@ int teash_gojump(int argc, char **argv)
  * \brief Get a number from a string with a few prefixes
  * \param[in] pointer to string to parse
  *
- * Parses a number with optional prefix modifier.  The number is either in
- * decimal or hex, starting with '0x'.  The prefix is '@', '-', or '~'.
+ * Parses a number or variable with optional prefix modifier.
+ * A number is either in decimal or hex, starting with '0x'.
+ * A variable is the single character 'A-Z', '?', or '@'.
+ * The prefix is '@', '-', or '~'.
+ * 
+ * (Note that yes, '@' is both a prefix and a variable.)
  * 
  * '~' is binary inverse. '-' is negative. '@' is memory dereference. For '@'
  * the number becomes a memoery address and reads an integer from that
  * location.  This could cause unaligned failures if you are not careful.
  *
- * \note No indication of parse failures.
+ * \note There is no indication of parse failures.
  *
  * \retval Number parsed.
  */
-long teash_strtol(char *s)
+int32_t teash_get_number(char*s)
 {
-    long r;
-    int post = 0;
-
-    if(*s == '@') { /* XXX maybe broken. colliding with the variable of same name. */
+    int32_t a;
+    int post=0;
+    if(*s == '@' && (teash_isvar(s[1]) || isdigit(s[1]))) {
         post = 1;
-        s++;
-    } else if(*s=='-') {
-        post = 2;
-        s++;
     } else if(*s=='~') {
+        post = 2;
+    } else if(*s=='-') {
         post = 3;
-        s++;
+    } else {
+        s--;
     }
-    r = strtol(s, NULL, 0);
+    s++;
+
+    if(teash_isvar(*s)) {
+        a = teash_get_var(teash_get_state(), *s);
+    } else {
+        a = strtol(s, NULL, 0);
+    }
+
     if(post == 3) {
-        r = ~ r;
+        a = - a;
     } else if(post == 2) {
-        r = - r;
+        a = ~a;
     } else if(post == 1) {
-        r = *((int*)r);
+#ifdef TEASH_FORCE_ALIGNMENT
+        a &= ~0x3; /* Force alignment on 32bit boundry. (for ARM) */
+#endif
+        a = *((int32_t*)a);
     }
-    return r;
+
+    return a;
 }
 
 /**
@@ -311,19 +324,11 @@ int teash_skiplet(int argc, char **argv)
     int a=0, b=0;
     if(argc == 1) return 0;
 
-    if(teash_isvar(argv[1][0])) {
-        a = teash_get_var(teash, argv[1][0]);
-    } else {
-        a = teash_strtol(argv[1]);
-    }
+    a = teash_get_number(argv[1]);
     if(argc < 4) goto checkskip;
 
     if(strcmp("->",argv[2])!=0) {
-        if(teash_isvar(argv[3][0])) {
-            b = teash_get_var(teash, argv[3][0]);
-        } else {
-            b = teash_strtol(argv[3]);
-        }
+        b = teash_get_number(argv[3]);
 
         switch(argv[2][0]) {
             case '+': a += b; break;
