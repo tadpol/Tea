@@ -156,13 +156,13 @@ teash_state_t* teash_get_state(void);
 /*****************************************************************************/
 
 /**
- * \brief Setup a memory area to store script, dictionary and variables.
+ * \brief Setup a memory area to store script and variables.
  */
 int teash_init_memory(uint8_t *memory, unsigned size, struct teash_memory_s *mem)
 {
     char *mem_end;
 
-    /* script and dict are byte addressed, so no alignment needed */
+    /* script is byte addressed, so no alignment needed */
     mem->mem_start = (char*)memory;
     /* vars need to be 32bit aligned, so line up the end and stay inside. */
     mem_end = (char*)(((ptrdiff_t)memory+size) & ~0x3);
@@ -263,7 +263,7 @@ int teash_gojump(int argc, char **argv)
  * (Note that yes, '@' is both a prefix and a variable.)
  * 
  * '~' is binary inverse. '-' is negative. '@' is memory dereference. For '@'
- * the number becomes a memoery address and reads an integer from that
+ * the number becomes a memory address and reads an integer from that
  * location.  This could cause unaligned failures if you are not careful.
  *
  * \note There is no indication of parse failures.
