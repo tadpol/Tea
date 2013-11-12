@@ -5,6 +5,8 @@
  * Can be used directly, but does assume that there is a frontend more then
  * just a terminal running on the other side.
  *
+ * A very thin balancing act to be both just a protocol, but also something
+ * that can be typed out.
  *
  * Primarily driven as something I use on little systems and attached
  * to someone else's shell type environment.
@@ -55,13 +57,20 @@
 #define tea_putc(...) do{}while(0)
 #endif
 
+/*****************************************************************************/
 typedef unsigned long teaint; /*!< a 64 bit number */
 //typedef unsigned int teaint; /*!< a 32 bit number */
 typedef unsigned short teashort; /*!< a 16 bit number */
 typedef unsigned char teabyte; /*!< a 8 bit number */
 
-#define alignPointer(p) (p) = ((void*)(((teaint)(p)+sizeof(teaint)-1UL)&~(sizeof(teaint)-1UL)))
+/*****************************************************************************/
 
+struct tea_pTable_s {
+    char *name;
+    void *ptr;
+};
+
+/*****************************************************************************/
 /**
  * How big is the stack
  */
@@ -72,7 +81,9 @@ teaint *tea_SP = tea_stack;
 teabyte tea_token[32];
 teabyte tea_token_idx=0;
 
-/* XXX These need to move out into a header. */
+extern struct tea_pTable_s *tea_pTable;
+
+/*****************************************************************************/
 /**
  * \breif Push a number onto the stack
  */
@@ -278,23 +289,33 @@ teaint tea_do_token(void)
         }
     } else
 
+    if( *cmd == 'A' ) { // Align ( ptr -- ptr )
+        a = ((teaint)(a)+sizeof(teaint)-1UL)&~(sizeof(teaint)-1UL);
+        adjust = 0;
+    } else
+
     if( *cmd == 't' ) {
         cmd++;
-        adjust=1;
         if( *cmd == 's' ) { // Pointer to stack ( -- length ptr )
             a = sizeof(tea_stack);
             b = (teaint)&tea_stack;
+            adjust = 2;
+            pushback = 2;
         } else
         if( *cmd == 't' ) { // Pointer to token ( -- length ptr )
             a = sizeof(tea_token);
             b = (teaint)&tea_token;
+            adjust = 2;
+            pushback = 2;
         } else
         {
-            a = 0;
             cmd--;
+            adjust = 0;
+            pushback = 0;
         }
     } else
 
+    /* Read memory */
     if( *cmd == '@' ) {
         cmd++;
         adjust = 0;
@@ -325,6 +346,7 @@ teaint tea_do_token(void)
         }
     } else
 
+    /* Write memory */
     if( *cmd == '!' ) {
         cmd++;
         adjust = -2;
@@ -371,10 +393,19 @@ teaint tea_do_token(void)
 
     } else
 
-    // TODO: table lookup of external commands.
-    { // NOP
+    { /* Lookup external token. */
         adjust = 0;
         pushback = 0;
+
+        struct tea_pTable_s *pt = tea_pTable;
+        for(; pt->name != NULL; pt++) {
+            if(strcmp(cmd, pt->name) == 0) {
+                a = pt->ptr;
+                adjust = 1;
+                pushback = 1;
+                break;
+            }
+        }
     }
 
     /* Now that the command has been completed, put things back into the
