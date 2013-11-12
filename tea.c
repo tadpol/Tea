@@ -81,7 +81,7 @@ teaint *tea_SP = tea_stack;
 teabyte tea_token[32];
 teabyte tea_token_idx=0;
 
-extern struct tea_pTable_s *tea_pTable;
+struct tea_pTable_s tea_pTable[] = {{NULL,NULL}};
 
 /*****************************************************************************/
 /**
@@ -399,8 +399,8 @@ teaint tea_do_token(void)
 
         struct tea_pTable_s *pt = tea_pTable;
         for(; pt->name != NULL; pt++) {
-            if(strcmp(cmd, pt->name) == 0) {
-                a = pt->ptr;
+            if(strcmp((char*)cmd, pt->name) == 0) {
+                a = (teaint)pt->ptr;
                 adjust = 1;
                 pushback = 1;
                 break;
