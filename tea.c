@@ -163,7 +163,7 @@ teaint tea_do_token(void)
     /* Now do the command */
     if( *cmd >= '0' && *cmd <= '9' ) {
         teabyte base;
-        // push number ( -- value )
+        /* push number ( -- value ) */
         if( *(cmd+1) == 'b' ) {
             base = 2;
             cmd+=2;
@@ -196,14 +196,14 @@ teaint tea_do_token(void)
     } else
 
     if( *cmd == 's' ) {
-        if( *(cmd+1) == 'n' ) { // nswap ( n a ... b -- b ... a )
+        if( *(cmd+1) == 'n' ) { /*  nswap ( n a ... b -- b ... a ) */
             cmd++;
             /* top is index into stack, pop, then swap top and nth */
             a++; // add one because we haven't dropped the index yet.
             c = *(tea_SP-a);
             *(tea_SP-a) = b;
             a = c;
-        } else { // swap ( a b -- b a )
+        } else { /*  swap ( a b -- b a ) */
             c = b;
             b = a;
             a = c;
@@ -212,97 +212,97 @@ teaint tea_do_token(void)
         }
     } else
     if( *cmd == 'v' ) {
-        if( *(cmd+1) == 'n' ) { // ndup ( n a ... b -- b a ... b )
+        if( *(cmd+1) == 'n' ) { /*  ndup ( n a ... b -- b a ... b ) */
             cmd++;
             a++;
             a = *(tea_SP - a);
             adjust = 0;
-        } else { // dup ( a -- a a )
+        } else { /*  dup ( a -- a a ) */
             adjust = 1;
         }
     } else
-    if( *cmd == 'x' ) { // drop ( a -- )
+    if( *cmd == 'x' ) { /*  drop ( a -- ) */
         pushback = 0;
     } else
 
-    if( *cmd == '+' ) { // add ( a b -- b+a )
+    if( *cmd == '+' ) { /*  add ( a b -- b+a ) */
         a = b + a;
     } else
-    if( *cmd == '-' ) { // sub ( a b -- b-a )
+    if( *cmd == '-' ) { /*  sub ( a b -- b-a ) */
         a = b - a;
     } else
-    if( *cmd == '*' ) { // multiply ( a b -- b*a )
+    if( *cmd == '*' ) { /*  multiply ( a b -- b*a ) */
         a = b * a;
     } else
-    if( *cmd == '/' ) { // divide ( a b -- b/a )
+    if( *cmd == '/' ) { /*  divide ( a b -- b/a ) */
         a = b / a;
     } else
-    if( *cmd == '%' ) { // modulo ( a b -- b%a )
+    if( *cmd == '%' ) { /*  modulo ( a b -- b%a ) */
         a = b % a;
     } else
 
     if( *cmd == '|' ) {// Bit OR ( a b -- b|a )
         a = b | a;
     } else
-    if( *cmd == '^' ) { // Bit XOR ( a b -- b^a )
+    if( *cmd == '^' ) { /*  Bit XOR ( a b -- b^a ) */
         a = b ^ a;
     } else
-    if( *cmd == '&' ) { // Bit AND ( a b -- b&a )
+    if( *cmd == '&' ) { /*  Bit AND ( a b -- b&a ) */
         a = b & a;
     } else
-    if( *cmd == '~' ) { // Bit invert ( a -- ~a )
+    if( *cmd == '~' ) { /*  Bit invert ( a -- ~a ) */
         a = ~a;
         adjust = 0;
     } else
 
-    if( *cmd == '=' ) { // Test equal to ( a b -- a==b )
+    if( *cmd == '=' ) { /*  Test equal to ( a b -- a==b ) */
         a = a == b;
     } else
 
     if( *cmd == '>' ) {
         cmd++;
-        if( *cmd == '>' ) { // Bit shift right ( a b -- b>>a )
+        if( *cmd == '>' ) { /*  Bit shift right ( a b -- b>>a ) */
             a = b >> a;
         } else
-        if( *cmd == '=' ) { // Test Greater than equalto ( a b -- b>=a )
+        if( *cmd == '=' ) { /*  Test Greater than equalto ( a b -- b>=a ) */
             a = b >= a;
         } else
-        { // Test Greater than ( a b -- b>a )
+        { /*  Test Greater than ( a b -- b>a ) */
             a = b > a;
             cmd--;
         }
     } else
     if( *cmd == '<' ) {
         cmd++;
-        if( *cmd == '<' ) { // Bit shift left ( a b -- b<<a )
+        if( *cmd == '<' ) { /*  Bit shift left ( a b -- b<<a ) */
             a = b << a;
         } else
-        if( *cmd == '=' ) { // Test Less Than equalto ( a b -- b<=a )
+        if( *cmd == '=' ) { /*  Test Less Than equalto ( a b -- b<=a ) */
             a = b <= a;
         } else
-        if( *cmd == '>' ) { // Test not equal to ( a b -- a<>b )
+        if( *cmd == '>' ) { /*  Test not equal to ( a b -- a<>b ) */
             a = a != b;
         } else
-        { // Test Less Than ( a b -- b<a )
+        { /*  Test Less Than ( a b -- b<a ) */
             a = b < a;
             cmd--;
         }
     } else
 
-    if( *cmd == 'A' ) { // Align ( ptr -- ptr )
+    if( *cmd == 'A' ) { /*  Align ( ptr -- ptr ) */
         a = ((teaint)(a)+sizeof(teaint)-1UL)&~(sizeof(teaint)-1UL);
         adjust = 0;
     } else
 
     if( *cmd == 't' ) {
         cmd++;
-        if( *cmd == 's' ) { // Pointer to stack ( -- length ptr )
+        if( *cmd == 's' ) { /*  Pointer to stack ( -- length ptr ) */
             a = sizeof(tea_stack);
             b = (teaint)&tea_stack;
             adjust = 2;
             pushback = 2;
         } else
-        if( *cmd == 't' ) { // Pointer to token ( -- length ptr )
+        if( *cmd == 't' ) { /*  Pointer to token ( -- length ptr ) */
             a = sizeof(tea_token);
             b = (teaint)&tea_token;
             adjust = 2;
@@ -319,13 +319,13 @@ teaint tea_do_token(void)
     if( *cmd == '@' ) {
         cmd++;
         adjust = 0;
-        if( *cmd == 'c' ) { // Read Byte ( ptr -- value )
+        if( *cmd == 'c' ) { /*  Read Byte ( ptr -- value ) */
             a = *((teabyte*)a);
         } else
-        if( *cmd == 's' ) { // Read short ( ptr -- value )
+        if( *cmd == 's' ) { /*  Read short ( ptr -- value ) */
             a = *((teashort*)a);
         } else
-        if( *cmd == 'x' ) { // dump range ( length ptr -- )
+        if( *cmd == 'x' ) { /*  dump range ( length ptr -- ) */
             adjust = -2;
             pushback = 0;
             for(; a > 0; a--, b++) {
@@ -333,14 +333,14 @@ teaint tea_do_token(void)
                 tea_printf("%02x ", *((teabyte*)b));
             }
         } else
-        if( *cmd == 'r' ) { // raw dump range ( length ptr -- )
+        if( *cmd == 'r' ) { /*  raw dump range ( length ptr -- ) */
             adjust = -2;
             pushback = 0;
             for(; a > 0; a--, b++) {
                 tea_putc( *((teabyte*)b) );
             }
         } else
-        { // Read word ( ptr -- value )
+        { /*  Read word ( ptr -- value ) */
             a = *((teaint*)a);
             cmd--;
         }
@@ -351,33 +351,33 @@ teaint tea_do_token(void)
         cmd++;
         adjust = -2;
         pushback = 0;
-        if( *cmd == 'c' ) { // Write byte ( value ptr -- )
+        if( *cmd == 'c' ) { /*  Write byte ( value ptr -- ) */
             *((teabyte*)b) = a;
         } else
-        if( *cmd == 's' ) { // Write short ( value ptr -- )
+        if( *cmd == 's' ) { /*  Write short ( value ptr -- ) */
             *((teashort*)b) = a;
         } else
-        if( *cmd == '+' ) { // Increment word ( value ptr -- )
+        if( *cmd == '+' ) { /*  Increment word ( value ptr -- ) */
             *((teaint*)b) += a;
         } else
-        if( *cmd == '-' ) { // Decrement word ( value ptr -- )
+        if( *cmd == '-' ) { /*  Decrement word ( value ptr -- ) */
             *((teaint*)b) -= a;
         } else
-        if( *cmd == '@' ) { // Memcpy ( length src dest -- )
+        if( *cmd == '@' ) { /*  Memcpy ( length src dest -- ) */
             memcpy((void*)c, (void*)b, a);
             adjust = -3;
         } else
-        if( *cmd == '!' ) { // Memset ( value length dest -- )
+        if( *cmd == '!' ) { /*  Memset ( value length dest -- ) */
             memset((void*)c, a, b);
             adjust = -3;
         } else
-        { // Write word ( value ptr -- )
+        { /*  Write word ( value ptr -- ) */
             *((teaint*)b) = a;
             cmd--;
         }
     } else
 
-    if( *cmd == '`' ) { // Jump ( ptr -- )
+    if( *cmd == '`' ) { /*  Jump ( ptr -- ) */
         /* Need to adjust stack before calling so C func sees
          * the correct stack
          */
