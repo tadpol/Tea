@@ -57,31 +57,20 @@
 #define tea_putc(...) do{}while(0)
 #endif
 
-/*****************************************************************************/
-typedef unsigned long teaint; /*!< a 64 bit number */
-//typedef unsigned int teaint; /*!< a 32 bit number */
-typedef unsigned short teashort; /*!< a 16 bit number */
-typedef unsigned char teabyte; /*!< a 8 bit number */
+#define TEA_INTERNAL_USAGE
+#include "tea.h"
 
-/*****************************************************************************/
-
-struct tea_pTable_s {
-    char *name;
-    void *ptr;
-};
 
 /*****************************************************************************/
 /**
  * How big is the stack
  */
-#define tea_stack_depth 10
 teaint tea_stack[tea_stack_depth];
 teaint *tea_SP = tea_stack;
 
 teabyte tea_token[32];
 teabyte tea_token_idx=0;
 
-struct tea_pTable_s tea_pTable[] = {{NULL,NULL}};
 
 /*****************************************************************************/
 /**
@@ -99,6 +88,25 @@ teaint tea_pop(void)
     return *tea_SP--;
 }
 
+/*****************************************************************************/
+
+#if 0
+void tea_out(teaint v, teabyte rdx, teabyte tail)
+{
+    teabyte buf[32]; //??? or use token?
+    teabyte *b;
+    _ltoa(v, buf, rdx);
+
+    for(b=buf, *b!= '\0'; b++) {
+        tea_putc(*b);
+    }
+    if(tail != '\0') {
+        tea_putc(tail);
+    }
+}
+#endif
+
+/*****************************************************************************/
 /**
  * \brief Get a token by being pushed
  * \param[in] t A byte to process as part of an incoming token.
@@ -397,9 +405,9 @@ teaint tea_do_token(void)
         adjust = 0;
         pushback = 0;
 
-        struct tea_pTable_s *pt = tea_pTable;
-        for(; pt->name != NULL; pt++) {
-            if(strcmp((char*)cmd, pt->name) == 0) {
+        struct tea_ptr_alias_s *pt = tea_pa_table;
+        for(; pt->alias != NULL; pt++) {
+            if(strcmp((char*)cmd, pt->alias) == 0) {
                 a = (teaint)pt->ptr;
                 adjust = 1;
                 pushback = 1;
