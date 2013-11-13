@@ -90,7 +90,7 @@ teaint tea_pop(void)
 
 /*****************************************************************************/
 
-#if 0
+#if 0 /* or printf? or what? not all have printf.... */
 void tea_out(teaint v, teabyte rdx, teabyte tail)
 {
     teabyte buf[32]; //??? or use token?
