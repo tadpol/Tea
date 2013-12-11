@@ -1,4 +1,9 @@
-
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <ctype.h>
+#include <string.h>
 
 /*
  * I keep getting lost in making a language, when much of what I want is a shell.
@@ -13,17 +18,17 @@
 #define TEASH_LINE_BUFFER_SIZE  80
 
 #define TEASH_HISTORY_DEPTH 5
-
+#define teash_status_run        (1<<0)
 
 struct teash_state_s {
-    int history_idx;
-    char history_buf[TEASH_HISTORY_DEPTH][TEASH_LINE_BUFFER_SIZE];
+    int historyIdx;
+    char history[TEASH_HISTORY_DEPTH][TEASH_LINE_BUFFER_SIZE];
     char line[TEASH_LINE_BUFFER_SIZE];
-    char lineIdx;
-
+    uint8_t lineIdx;
     char esc_sbuf[25];
-    char escIdx;
+    uint8_t escIdx;
 
+    uint16_t status;
     uint8_t screen_height;
 
     int vars[10];
@@ -31,30 +36,34 @@ struct teash_state_s {
     char *script_end;
 } teash_state;
 
+/*****************************************************************************/
+#define teash_is_var(x)
+#define teash_var_get(x)
+#define teash_var_set(x,v)
 
 /*****************************************************************************/
-char *teash_math(char *line)
+char *teash_math(char *p)
 {
-    int st[10];
-    int *sp = st;
-    int a, b, pushback=1, adjust=-1;
+    long int st[10];
+    long int *sp = st;
+    long int a, b, pushback=1, adjust=-1;
 
-    while(*line != '\0' && *line != ']') {
+    while(*p != '\0' && *p != ']') {
         a = *sp;
         b = *(sp-1);
 
-        if(*line >= '0' && *line <= '9') {
-            uint8 base = 10;
-            if(*(line+1) == 'x') {
+        if(*p >= '0' && *p <= '9') {
+            uint8_t base = 10;
+            if(*(p+1) == 'x') {
                 base = 16;
                 p += 2;
-            } else if(*(line+1) == 'b') {
+            } else if(*(p+1) == 'b') {
                 base = 2;
                 p += 2;
             }
             a=0;
-            for(; *line != '\0'; line++) {
-                b = *line;
+            for(; *p != '\0'; p++) {
+                b = *p;
                 if( b >= '0' && b <= '9' ) b -= '0';
                 else if( b >= 'a' && b <= 'z') b = (b - 'a') + 10;
                 else if( b >= 'A' && b <= 'Z') b = (b - 'A') + 10;
@@ -64,61 +73,68 @@ char *teash_math(char *line)
                 a += b;
             }
             adjust = 1;
-        } else if(*line >= 'A' && *line <= 'Z') { /* TODO think about this more. */
+        } else if(*p >= 'A' && *p <= 'Z') { /* TODO think about this more. */
             /* variable lookup */
             adjust = 1;
-            a = teash_state.vars[*line - '?'];
-        } else if(*line >= 'a' && *line <= 'z') { /* TODO think about this more. */
+            a = teash_state.vars[*p - '?'];
+        } else if(*p >= 'a' && *p <= 'z') { /* TODO think about this more. */
             /* variable reference lookup */
-            a = &teash_state.vars[*line - '?'];
-        } else if(*line == 'x') {
+            a = (int)&teash_state.vars[*p - '?'];
+        } else if(*p == 'x') {
             pushback = 0;
-        } else if(*line == '+') {
+        } else if(*p == '+') {
             a = b + a;
-        } else if(*line == '-') {
+        } else if(*p == '-') {
             a = b - a;
-        } else if(*line == '*') {
+        } else if(*p == '*') {
             a = b * a;
-        } else if(*line == '/') {
+        } else if(*p == '/') {
             a = b / a;
-        } else if(*line == '%') {
+        } else if(*p == '%') {
             a = b % a;
-        } else if(*line == '|') {
+        } else if(*p == '|') {
             a = b | a;
-        } else if(*line == '&') {
+        } else if(*p == '&') {
             a = b & a;
-        } else if(*line == '^') {
+        } else if(*p == '^') {
             a = b ^ a;
-        } else if(*line == '~') {
+        } else if(*p == '~') {
             a = ~ a;
             adjust = 0;
 
-        } else if(*line == '@') {
-            line++;
+        } else if(*p == '@') {
+            p++;
             adjust = 0;
-            if(*line == 'c') {
+            if(*p == 'c') {
                 a = *((uint8_t*)a);
-            } else if(*line == 's') {
+            } else if(*p == 's') {
                 a = *((uint16_t*)a);
-            } else if(*line == 'i') {
+            } else if(*p == 'i') {
                 a = *((uint32_t*)a);
             } else {
-                a = *((uint32_t*)a);
-                --line;
+                a = *((int*)a);
+                --p;
             }
-        } else if(*line == '!') {
-            line++;
+        } else if(*p == '!') {
+            p++;
             adjust = -2;
-            if(*line == 'c') {
+            if(*p == 'c') {
                 *((uint8_t*)a) = b;
-            } else if(*line == 's') {
+            } else if(*p == 's') {
                 *((uint16_t*)a) = b;
-            } else if(*line == 'i') {
+            } else if(*p == 'i') {
                 *((uint32_t*)a) = b;
+            } else if(*p == '+') {
+                (*((int*)a)) ++;
+            } else if(*p == '-') {
+                (*((int*)a)) --;
             } else {
-                *((uint32_t*)a) = b;
-                --line;
+                *((int*)a) = b;
+                --p;
             }
+        } else {
+            adjust = 0;
+            pushback = 0;
         }
         sp += adjust;
         switch(pushback) {
@@ -129,11 +145,11 @@ char *teash_math(char *line)
         }
     }
 
-    if(*sp == 0) return NULL; /* math result is FALSE, do not eval rest of line. */
+    if(*sp == 0) return NULL; /* math result is FALSE, do not eval rest of p. */
 
-    if(*line == ']') line++;
-    for(; isspace(*line) && *line != '\0'; line++) {} /* skip whitespace */
-    return line;
+    if(*p == ']') p++;
+    for(; isspace(*p) && *p != '\0'; p++) {} /* skip whitespace */
+    return p;
 }
 
 void teash_eval(char *line)
@@ -148,6 +164,23 @@ void teash_eval(char *line)
      * - break into parameters
      *
      */
+}
+
+/*****************************************************************************/
+void teash_history_push(void)
+{
+    strcpy(teash_state.history[teash_state.historyIdx], teash_state.line);
+    teash_state.historyIdx++;
+    if(teash_state.historyIdx >= TEASH_HISTORY_DEPTH) {
+        teash_state.historyIdx = 0;
+    }
+}
+
+void teash_history_load(int idx)
+{
+    idx = (teash_state.historyIdx + idx) % TEASH_HISTORY_DEPTH; // FIXME this is likely wrong
+    strcpy(teash_state.line, teash_state.history[idx]);
+    teash_state.lineIdx = strlen(teash_state.line);
 }
 
 /*****************************************************************************/
@@ -193,12 +226,12 @@ int teash_load_line(uint16_t ln, char *newline)
     if( oldline >= teash_state.script_end ) {
         /* at the end, so just append. */
         oldline = teash_state.script_end;
-        if( teash_has_free(teash) < newlen) 
+        if( teash_has_free() < newlen) 
             return -2;
         teash_state.script_end += newlen;
     } else if( oldlen < newlen ) {
         /* growing */
-        if( teash_has_free(teash) < newlen-oldlen) 
+        if( teash_has_free() < newlen-oldlen) 
             return -2;
 
         memmove(oldline+newlen, oldline+oldlen, teash_state.script_end - oldline+oldlen);
@@ -238,8 +271,8 @@ void teash_load_or_eval(void)
     *(++p) = '\0'; /* end the line */
 
     /* skip whitespace */
-    for(p=line; isspace(*p) && *p != '\0'; p++) {}
-    if( *p == '\0' ) return 0;
+    for(p=teash_state.line; isspace(*p) && *p != '\0'; p++) {}
+    if( *p == '\0' ) return;
 
     /* is first word a number? */
     for(ln=0; isdigit(*p) && *p != '\0'; p++) {
@@ -250,7 +283,12 @@ void teash_load_or_eval(void)
         for(; isspace(*p) && *p != '\0'; p++) {} /* skip whitespace */
         teash_load_line(ln, p);
     }
+    teash_history_push();
     teash_eval(p);
+    while(teash_state.status & teash_status_run) {
+        /* TODO copy line from script to line. */
+        teash_eval(teash_state.line);
+    }
 }
 
 /**
@@ -259,21 +297,38 @@ void teash_load_or_eval(void)
 void teash_esc_eval(void)
 {
     int a, b;
-    if(strcmp(teash_state.esc_sbuf, "[A", 3)==0) { /* Cursor up */
+    if(strcmp(teash_state.esc_sbuf, "[A")==0) { /* Cursor up */
         /* Replace editing line with prev line. */
-    } else if(strcmp(teash_state.esc_sbuf, "[B", 3)==0) { /* Cursor down */
+        teash_history_load(-1);
+        printf("\x1b[%u;0f", teash_state.screen_height); /* Put cursor at edit line */
+        printf("%s", teash_state.line);
+        printf("\x1b[s"); /* Save cursor */
+        printf("\x1b[K"); /* Erase to end of line */
+
+    } else if(strcmp(teash_state.esc_sbuf, "[B")==0) { /* Cursor down */
         /* Replace editing line with Next line. */
-    } else if(strcmp(teash_state.esc_sbuf, "[C", 3)==0) { /* Cursor forward */
+        teash_history_load(1);
+        printf("\x1b[%u;0f", teash_state.screen_height); /* Put cursor at edit line */
+        printf("%s", teash_state.line);
+        printf("\x1b[s"); /* Save cursor */
+        printf("\x1b[K"); /* Erase to end of line */
+
+    } else if(strcmp(teash_state.esc_sbuf, "[C")==0) { /* Cursor forward */
         if(teash_state.line[teash_state.lineIdx] != '\0') {
             teash_state.lineIdx++;
         }
-        printf("\x1b[C");
-    } else if(strcmp(teash_state.esc_sbuf, "[D", 3)==0) { /* Cursor backward */
+        printf("\x1b[C"); /* Move right */
+        printf("\x1b[s"); /* Save cursor */
+
+    } else if(strcmp(teash_state.esc_sbuf, "[D")==0) { /* Cursor backward */
         if(teash_state.lineIdx > 0) {
             teash_state.lineIdx--;
         }
-        printf("\x1b[D");
+        printf("\x1b[D"); /* Move left */
+        printf("\x1b[s"); /* Save cursor */
+
     } else if(sscanf(teash_state.esc_sbuf, "[%u;%uR", &a, &b) == 2) {
+        teash_state.screen_height = a;
         printf("\x1b[0;%ur", teash_state.screen_height - 2);/* Scrolling region is top lines */
         printf("\x1b[%u;%uf", teash_state.screen_height, teash_state.lineIdx); /* Put cursor at edit line */
         printf("\x1b[s"); /* Save cursor */
@@ -292,16 +347,17 @@ void teash_inchar(int c)
             teash_state.escIdx = 0;
         } else if(c == '\b') {
             teash_state.line[--teash_state.lineIdx] = '\0';
-            teash_outchar('\b');
-            teash_outchar(' ');
-            teash_outchar('\b');
+            printf("\b \b");
+            putchar('\b');
+            putchar(' ');
+            putchar('\b');
         } else if(c == '\n') {
-            teash_state.line[teash_state.lineIdx++] = '\0';
             teash_load_or_eval();
             teash_state.lineIdx = 0;
         } else {
             teash_state.line[teash_state.lineIdx++] = c;
             teash_state.line[teash_state.lineIdx] = '\0';
+            putchar(c);
         }
     } else { /* In esc sequence */
         teash_state.esc_sbuf[teash_state.escIdx++] = c;
@@ -313,7 +369,16 @@ void teash_inchar(int c)
     }
 }
 
+/*****************************************************************************/
+#ifdef TEST_IT
+int main(int argc, char **argv)
+{
 
+
+
+    return 0;
+}
+#endif
 
 
 /* vim: set ai cin et sw=4 ts=4 : */
