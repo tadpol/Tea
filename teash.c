@@ -19,6 +19,7 @@
 
 #define TEASH_HISTORY_DEPTH 5
 #define teash_status_run        (1<<0)
+#define teash_status_math_err   (1<<1)
 
 struct teash_state_s {
     int historyIdx;
@@ -73,13 +74,13 @@ char *teash_math(char *p)
                 a += b;
             }
             adjust = 1;
-        } else if(*p >= 'A' && *p <= 'Z') { /* TODO think about this more. */
+        } else if(*p >= 'A' && *p <= 'Z') {
             /* variable lookup */
             adjust = 1;
-            a = teash_state.vars[*p - '?'];
-        } else if(*p >= 'a' && *p <= 'z') { /* TODO think about this more. */
-            /* variable reference lookup */
-            a = (int)&teash_state.vars[*p - '?'];
+            a = (int)&teash_state.vars[*p - 'A'];
+        } else if(*p == 'S') { /* Read status */
+            a = teash_state.status;
+            adjust = 1;
         } else if(*p == 'x') {
             pushback = 0;
         } else if(*p == '+') {
@@ -89,6 +90,10 @@ char *teash_math(char *p)
         } else if(*p == '*') {
             a = b * a;
         } else if(*p == '/') {
+            if(a == 0) {
+                teash_state.status |= teash_status_math_err;
+                return NULL;
+            }
             a = b / a;
         } else if(*p == '%') {
             a = b % a;
@@ -101,6 +106,31 @@ char *teash_math(char *p)
         } else if(*p == '~') {
             a = ~ a;
             adjust = 0;
+
+        } else if( *p == '=' ) { // Test equal to ( a b -- a==b )
+            a = a == b;
+        } else if( *p == '>' ) {
+            p++;
+            if( *p == '>' ) { // Bit shift right ( a b -- b>>a )
+                a = b >> a;
+            } else if( *p == '=' ) { // Test Greater than equalto ( a b -- b>=a )
+                a = b >= a;
+            } else { // Test Greater than ( a b -- b>a )
+                a = b > a;
+                p--;
+            }
+        } else if( *p == '<' ) {
+            p++;
+            if( *p == '<' ) { // Bit shift left ( a b -- b<<a )
+                a = b << a;
+            } else if( *p == '=' ) { // Test Less Than equalto ( a b -- b<=a )
+                a = b <= a;
+            } else if( *p == '>' ) { // Test not equal to ( a b -- a<>b )
+                a = a != b;
+            } else { // Test Less Than ( a b -- b<a )
+                a = b < a;
+                p--;
+            }
 
         } else if(*p == '@') {
             p++;
@@ -136,6 +166,10 @@ char *teash_math(char *p)
             adjust = 0;
             pushback = 0;
         }
+        if(((sp+adjust) < (st-1)) || ((sp+adjust) >= (st + 10))) {
+            teash_state.status |= teash_status_math_err;
+            return NULL;
+        }
         sp += adjust;
         switch(pushback) {
             case 2: *(sp-1) = b;
@@ -151,6 +185,7 @@ char *teash_math(char *p)
     for(; isspace(*p) && *p != '\0'; p++) {} /* skip whitespace */
     return p;
 }
+/*****************************************************************************/
 
 void teash_eval(char *line)
 {
