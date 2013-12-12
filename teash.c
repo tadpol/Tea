@@ -42,12 +42,25 @@ struct teash_state_s {
     uint16_t status;
     uint8_t screen_height;
 
-    int vars[10];
+    int vars[8];
     char script[1024];
     char *script_end;
+    char *LP;
 
     teash_cmd_t *root;
-} teash_state;
+} teash_state = {
+    .historyIdx = 0,
+    .lineIdx = 0,
+    .escIdx = 0,
+    .status = 0,
+    .screen_height = 24,
+    .script_end = NULL,
+    .LP = NULL,
+    .root = NULL,
+};
+
+/*****************************************************************************/
+
 
 /*****************************************************************************/
 int teash_var_name_to_index(int var)
@@ -244,7 +257,7 @@ int teash_exec(int argc, char **argv)
      * For nested commands, only the right most is passed in.
      * So for a cmd "spi flash dump 256 32" argv[0] is "dump"
      */
-    for(; current->name != NULL; ) {
+    for(; current != NULL && current->name != NULL; ) {
         if( strcmp(current->name, argv[ac]) == 0) {
             /* Matched name. */
             if( current->sub == NULL || (argc-ac) == 1) {
@@ -415,6 +428,48 @@ void teash_history_load(int idx)
 }
 
 /*****************************************************************************/
+/**
+ * \brief Goto a line (or the next one if not exact)
+ *
+ * Finds a line or the next following.  If looking for line 22, but only
+ * lines 20 and 25 exist, will return line 25.
+ *
+ */
+void teash_goto_line(uint16_t ln)
+{
+    char *p = teash_state.script;
+    uint16_t tln;
+
+    while(p < teash_state.script_end) {
+        tln = *(uint8_t*)p++;
+        tln <<=8;
+        tln |= *(uint8_t*)p++;
+
+        if( tln >= ln ) {
+            teash_state.LP = p;
+            return;
+        }
+
+        tln = strlen(p) + 1;
+        p += tln;
+    }
+
+    teash_state.LP = NULL;
+}
+
+/**
+ * \brief Jump to the next line in the script.
+ */
+void teash_next_line(void)
+{
+    teash_state.LP += strlen(teash_state.LP) + 3;
+    if( teash_state.LP >= teash_state.script_end)
+        teash_state.LP = NULL;
+}
+
+/**
+ * \brief How much free script space is there?
+ */
 int teash_has_free(void)
 {
     return (teash_state.script + sizeof(teash_state.script)) - teash_state.script_end;
@@ -518,7 +573,9 @@ void teash_load_or_eval(void)
     teash_eval(p);
     while(teash_state.status & teash_status_run) {
         /* TODO copy line from script to line. */
+        strcpy(teash_state.line, teash_state.LP); /* FIXME more thought here. */
         teash_eval(teash_state.line);
+        teash_next_line();
     }
 }
 
@@ -579,9 +636,6 @@ void teash_inchar(int c)
         } else if(c == '\b') {
             teash_state.line[--teash_state.lineIdx] = '\0';
             printf("\b \b");
-            putchar('\b');
-            putchar(' ');
-            putchar('\b');
         } else if(c == '\n') {
             teash_load_or_eval();
             teash_state.lineIdx = 0;
@@ -604,7 +658,11 @@ void teash_inchar(int c)
 #ifdef TEST_IT
 int main(int argc, char **argv)
 {
+    int c;
 
+    while((c=getchar()) != EOF) {
+        teash_inchar(c);
+    }
 
 
     return 0;
