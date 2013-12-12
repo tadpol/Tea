@@ -16,10 +16,20 @@
  */
 
 #define TEASH_LINE_BUFFER_SIZE  80
+#define TEASH_HISTORY_DEPTH     5
+#define TEASH_PARAM_MAX         10
 
-#define TEASH_HISTORY_DEPTH 5
 #define teash_status_run        (1<<0)
 #define teash_status_math_err   (1<<1)
+#define teash_status_vars_err   (1<<2)
+
+typedef int(*teash_f)(int,char**);
+typedef struct teash_cmd_s teash_cmd_t;
+struct teash_cmd_s {
+    char *name;
+    teash_f cmd;
+    teash_cmd_t *sub;
+};
 
 struct teash_state_s {
     int historyIdx;
@@ -35,12 +45,47 @@ struct teash_state_s {
     int vars[10];
     char script[1024];
     char *script_end;
+
+    teash_cmd_t *root;
 } teash_state;
 
 /*****************************************************************************/
-#define teash_is_var(x)
-#define teash_var_get(x)
-#define teash_var_set(x,v)
+int teash_var_name_to_index(int var)
+{
+    const char varnames[] = "ABCDRXYZ";
+    int i;
+    for(i=0; varnames[i] != '\0'; i++) {
+        if(varnames[i] == var) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+int teash_isvar(int var)
+{
+    return teash_var_name_to_index(var) >= 0;
+}
+
+int teash_var_get(int var)
+{
+    int idx = teash_var_name_to_index(var);
+    if(idx < 0) {
+        teash_state.status |= teash_status_vars_err;
+        return 0;
+    }
+    return teash_state.vars[idx];
+}
+
+int teash_var_set(int var, int value)
+{
+    int idx = teash_var_name_to_index(var);
+    if(idx < 0) {
+        teash_state.status |= teash_status_vars_err;
+        return 0;
+    }
+    return teash_state.vars[idx] = value;
+}
 
 /*****************************************************************************/
 char *teash_math(char *p)
@@ -49,7 +94,7 @@ char *teash_math(char *p)
     long int *sp = st;
     long int a, b, pushback=1, adjust=-1;
 
-    while(*p != '\0' && *p != ']') {
+    for(;*p != '\0' && *p != ']';p++) {
         a = *sp;
         b = *(sp-1);
 
@@ -74,10 +119,10 @@ char *teash_math(char *p)
                 a += b;
             }
             adjust = 1;
-        } else if(*p >= 'A' && *p <= 'Z') {
+        } else if(teash_isvar(*p)) {
             /* variable lookup */
             adjust = 1;
-            a = (int)&teash_state.vars[*p - 'A'];
+            a = (int)&teash_state.vars[teash_var_name_to_index(*p)];
         } else if(*p == 'S') { /* Read status */
             a = teash_state.status;
             adjust = 1;
@@ -187,18 +232,169 @@ char *teash_math(char *p)
 }
 /*****************************************************************************/
 
+/**
+ * \breif Search for a command, and call it when found.
+ */
+int teash_exec(int argc, char **argv)
+{
+    int ac = 0;
+    teash_cmd_t *current = teash_state.root;
+
+    /* params passed must include command name as argv[0].
+     * For nested commands, only the right most is passed in.
+     * So for a cmd "spi flash dump 256 32" argv[0] is "dump"
+     */
+    for(; current->name != NULL; ) {
+        if( strcmp(current->name, argv[ac]) == 0) {
+            /* Matched name. */
+            if( current->sub == NULL || (argc-ac) == 1) {
+                /* Cannot go deeper, try to call */
+                if( current->cmd ) {
+                    return current->cmd((argc-ac), &argv[ac]);
+                }
+                break;
+            } else {
+                /* try going deeper. */
+                current = current->sub;
+                continue;
+            }
+        }
+        current++;
+    }
+
+    /* No commands anywhere to run what was requested. */
+    return -1;
+}
+
+/**
+ * \brief put ASCII form of number into stream.
+ *
+ * Not sure why doing it this way instead of sprintf
+ */
+char* teash_itoa(int i, char *b, unsigned max)
+{
+    char tb[12];
+    char *t = tb;
+    char sign = '+';
+    if(max == 0) return b;
+
+    /* check sign */
+    if( i < 0 ) {
+        sign = '-';
+        i = -i;
+    }
+
+    /* ascii-fy (backwards.) */
+    do {
+        *t++ = (i%10) + '0';
+        i /= 10;
+    }while(i>0);
+
+    if( (t-tb) > max ) {
+        /* not enough room, replace with underbar. */
+        *b++ = '_';
+        return b;
+    }
+
+    /* Put number into buffer */
+    if(sign == '-')
+        *b++ = '-';
+    for(t--; t >= tb;) {
+        *b++ = *t--;
+    }
+    return b;
+}
+
+/**
+ * \brief Find the $vars and replace them
+ *
+ * This is a in-string replacement; similar to how shells work.
+ *
+ * This works within the line length limits. If a replacement is too long
+ * to fit, it will get either nothing, or a '_'.
+ * XXX This behavor needs to be cleaned up.
+ *
+ */
+int teash_subst(char *b, char *be)
+{
+    /* First slide buffer to back */
+    unsigned l = be-(b+strlen(b));
+    memmove(b+l, b, l);
+
+    char *in = b+l;
+
+    /* Now work over as if two buffers. */
+    for(; *in != '\0' && b < in; in++, b++) {
+        if( *in != '$' ) {
+            *b = *in;
+        } else {
+            in++;
+            if( *in == '$' ) {
+                *b = '$';
+            } else if( teash_isvar(*in) ) {
+                /* Number variable. grab it and ascii-fy it */
+                b = teash_itoa(teash_var_get(*in), b, in-b);
+                b--;
+            }
+        }
+    }
+
+    *b = '\0';
+    return 0;
+}
+
+/**
+ * \brief take a line, do subs, and break it into params.
+ * \param[in,out] line The string to parse. This is modified heavily.
+ */
 void teash_eval(char *line)
 {
+    char *argv[TEASH_PARAM_MAX+1];
+    char *end=NULL;
+    int argc;
+
     if(*line == '[') {
         /* line is prefixed with a math test. */
         line = teash_math(line);
         if(line == NULL || *line == '\0') return;
     }
 
-    /* - do substitutions
-     * - break into parameters
-     *
-     */
+    /* do substitutions */
+    teash_subst(line, line+TEASH_LINE_BUFFER_SIZE); // FIXME End is in wrong place.
+
+    /* Break up into parameters */
+    for(argc=0; *line != '\0'; line++) {
+        /* skip white space */
+        for(; isspace(*line) && *line != '\0'; line++) {}
+        if( *line == '\0' ) break;
+
+        if( *line == '"' ) {
+            line++; /* skip over the quote */
+            argv[argc++] = line;
+            for(; *line != '"' && *line != '\0'; line++) {
+                if( *line == '\\' ) {
+                    if( end == NULL ) {
+                        /* We only get the end if we need it.
+                         * But once we have it, we don't need to get it
+                         * again.
+                         */
+                        for(end=line; *end != '\0'; end++) {}
+                    }
+                    /* slide all on down */
+                    memmove(line, line+1, end-line);
+                    end --;
+                }
+            }
+        } else {
+            argv[argc++] = line;
+            /* find end */
+            for(; !isspace(*line) && *line != '\0'; line++) {}
+        }
+        if( *line == '\0' ) break;
+        *line = '\0';
+    }
+
+    teash_var_set('R', teash_exec(argc, argv));
 }
 
 /*****************************************************************************/
