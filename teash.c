@@ -481,7 +481,8 @@ void teash_history_push(void)
 
 void teash_history_load(int idx)
 {
-    idx = (teash_state.historyIdx + idx) % TEASH_HISTORY_DEPTH; // FIXME this is likely wrong
+    idx = (teash_state.historyIdx + idx) % TEASH_HISTORY_DEPTH;
+    if(idx < 0) idx += TEASH_HISTORY_DEPTH;
     strcpy(teash_state.line, teash_state.history[idx]);
     teash_state.lineIdx = strlen(teash_state.line);
 }
