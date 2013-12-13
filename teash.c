@@ -18,6 +18,7 @@
 #define TEASH_LINE_BUFFER_SIZE  80
 #define TEASH_HISTORY_DEPTH     5
 #define TEASH_PARAM_MAX         10
+#define TEASH_RETRUNSTACK_SIZE  10
 
 #define teash_status_event_0    (1<<0)
 #define teash_status_event_1    (1<<1)
@@ -51,14 +52,18 @@ struct teash_state_s {
     char *script_end;
     char *LP;
 
+    uint16_t returnStack[TEASH_RETRUNSTACK_SIZE];
+    uint16_t *RS;
+
     teash_cmd_t *root;
 } teash_state = {
     .historyIdx = 0,
     .lineIdx = 0,
     .escIdx = 0,
     .screen_height = 24,
-    .script_end = NULL,
+    .script_end = teash_state.script,
     .LP = NULL,
+    .RS = teash_state.returnStack,
     .root = NULL,
 };
 
@@ -467,7 +472,9 @@ void teash_history_load(int idx)
  * \brief Goto a line (or the next one if not exact)
  *
  * Finds a line or the next following.  If looking for line 22, but only
- * lines 20 and 25 exist, will return line 25.
+ * lines 20 and 25 exist, will goto line 25.
+ *
+ * If looking beyond the last line, stops running.
  *
  */
 void teash_goto_line(uint16_t ln)
@@ -606,11 +613,12 @@ void teash_load_or_eval(void)
     }
     teash_history_push();
     teash_eval(p);
-    while(teash_state.status & teash_status_run) {
-        /* TODO copy line from script to line. */
-        strcpy(teash_state.line, teash_state.LP); /* FIXME more thought here. */
+
+    /* Check to see if we should be running script code */
+    while(teash_state.LP != NULL) {
+        strcpy(teash_state.line, teash_state.LP);
+        teash_next_line(); /* Set up LP for the next line after this one */
         teash_eval(teash_state.line);
-        teash_next_line();
     }
 }
 
@@ -687,6 +695,69 @@ void teash_inchar(int c)
             teash_esc_eval();
         }
     }
+}
+
+/*****************************************************************************/
+/**
+ * \brief Goto, Gosub, Return, Run, and End all together since they're mostly the same
+ *
+ * This jumps to the next equal-or-greater line. (or to the end.)
+ *
+ * FE: if the script only has lines 10 and 20, and sees a "goto 15", it will
+ * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
+ * the end of the script.) This is the same for gosub.
+ *
+ * This is written so that it works from the command prompt.  It jumps into 
+ * the script to the line requested.  
+ *
+ * The difference between goto and gosub is that gosub pushes the next line 
+ * onto the return stack. (unless the return stack is full)
+ *
+ * Return pops the return stack and goes to that line.  If the return stack 
+ * is empty, return exits the script and goes to the command prompt.
+ *
+ * Run resets the return stack and otherwise is identical to "goto 0"
+ *
+ * End stops the script
+ */
+int teash_gojump(int argc, char **argv)
+{
+    int ln = 0;
+    int ret = 0;
+    if(argc > 1) {
+        ln = strtoul(argv[1], NULL, 0);
+    }
+
+    if( argv[0][0] == 'e' ) { /* called as 'End' */
+        ret = ln; /* argv[1] is actually return value */
+        teash_state.LP = NULL;
+        return ret;
+    } else if( argv[0][1] == 'u' ) { /* called as 'rUn' */
+        teash_state.RS = teash_state.returnStack; /* reset RS */
+        ln = 0;
+    } else if( argv[0][1] == 'e' ) { /* called as 'rEturn' */
+        ret = ln; /* argv[1] is actually return value */
+        if(teash_state.RS <= teash_state.returnStack) {
+            return ret;
+        } else {
+            teash_state.RS--;
+            ln = *(teash_state.RS);
+        }
+    } else if(argv[0][2] == 's') { /* called as 'goSub' */
+        if(teash_state.RS > &teash_state.returnStack[TEASH_RETRUNSTACK_SIZE]) {
+            teash_var_status_set(teash_status_gosub_err);
+            return -2; /* no return stack space left. */
+        }
+        if(teash_state.LP) {
+            /* LP is the next line to run, not current. */
+            *(teash_state.RS) = (*(teash_state.LP-2) <<8) | *(teash_state.LP-1);
+            teash_state.RS++;
+        }
+    }
+    /* else is goto. */
+
+    teash_goto_line(ln);
+    return ret;
 }
 
 /*****************************************************************************/
