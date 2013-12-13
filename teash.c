@@ -19,9 +19,14 @@
 #define TEASH_HISTORY_DEPTH     5
 #define TEASH_PARAM_MAX         10
 
-#define teash_status_run        (1<<0)
-#define teash_status_math_err   (1<<1)
-#define teash_status_vars_err   (1<<2)
+#define teash_status_event_0    (1<<0)
+#define teash_status_event_1    (1<<1)
+#define teash_status_event_2    (1<<2)
+#define teash_status_event_3    (1<<3)
+#define teash_status_gosub_err  (1<<4)
+#define teash_status_math_err   (1<<5)
+#define teash_status_vars_err   (1<<6)
+#define teash_status_in_event   (1<<7)
 
 typedef int(*teash_f)(int,char**);
 typedef struct teash_cmd_s teash_cmd_t;
@@ -39,10 +44,9 @@ struct teash_state_s {
     char esc_sbuf[25];
     uint8_t escIdx;
 
-    uint16_t status;
     uint8_t screen_height;
 
-    int vars[8];
+    int vars[9];
     char script[1024];
     char *script_end;
     char *LP;
@@ -52,7 +56,6 @@ struct teash_state_s {
     .historyIdx = 0,
     .lineIdx = 0,
     .escIdx = 0,
-    .status = 0,
     .screen_height = 24,
     .script_end = NULL,
     .LP = NULL,
@@ -63,9 +66,27 @@ struct teash_state_s {
 
 
 /*****************************************************************************/
+/**
+ * \brief Get the index offset from a variable name
+ * \param[in] var Variable name
+ * \returns int Array index to var or -1 for not found
+ *
+ * Variable 'S' is the status bits. The bits have meaning and get updated for
+ * various things as the system runs.
+ *
+ * Variable 'R' is the return value of the last execed command.
+ *
+ * Remaining variables are just values.
+ *
+ * ---
+ *  I have a reoccurring thought to make XYZ special in that they will auto
+ *  increment or decrement with access.  I don't know if that's a good idea
+ *  or not.
+ *
+ */
 int teash_var_name_to_index(int var)
 {
-    const char varnames[] = "ABCDRXYZ";
+    const char varnames[] = "SRABCDXYZ";
     int i;
     for(i=0; varnames[i] != '\0'; i++) {
         if(varnames[i] == var) {
@@ -80,11 +101,28 @@ int teash_isvar(int var)
     return teash_var_name_to_index(var) >= 0;
 }
 
+void teash_var_status_set(int bits)
+{
+    /* Status is always index 0 */
+    teash_state.vars[0] |= bits;
+}
+
+int teash_var_status_get(void)
+{
+    /* Status is always index 0 */
+    return teash_state.vars[0];
+}
+
+int teash_var_status_test(int bits)
+{
+    return (teash_state.vars[0] & bits) == bits;
+}
+
 int teash_var_get(int var)
 {
     int idx = teash_var_name_to_index(var);
     if(idx < 0) {
-        teash_state.status |= teash_status_vars_err;
+        teash_var_status_set(teash_status_vars_err);
         return 0;
     }
     return teash_state.vars[idx];
@@ -94,7 +132,7 @@ int teash_var_set(int var, int value)
 {
     int idx = teash_var_name_to_index(var);
     if(idx < 0) {
-        teash_state.status |= teash_status_vars_err;
+        teash_var_status_set(teash_status_vars_err);
         return 0;
     }
     return teash_state.vars[idx] = value;
@@ -136,9 +174,6 @@ char *teash_math(char *p)
             /* variable lookup */
             adjust = 1;
             a = (int)&teash_state.vars[teash_var_name_to_index(*p)];
-        } else if(*p == 'S') { /* Read status */
-            a = teash_state.status;
-            adjust = 1;
         } else if(*p == 'x') {
             pushback = 0;
         } else if(*p == '+') {
@@ -149,7 +184,7 @@ char *teash_math(char *p)
             a = b * a;
         } else if(*p == '/') {
             if(a == 0) {
-                teash_state.status |= teash_status_math_err;
+                teash_var_status_set(teash_status_math_err);
                 return NULL;
             }
             a = b / a;
@@ -225,7 +260,7 @@ char *teash_math(char *p)
             pushback = 0;
         }
         if(((sp+adjust) < (st-1)) || ((sp+adjust) >= (st + 10))) {
-            teash_state.status |= teash_status_math_err;
+            teash_var_status_set(teash_status_math_err);
             return NULL;
         }
         sp += adjust;
