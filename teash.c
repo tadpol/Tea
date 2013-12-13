@@ -69,6 +69,11 @@ struct teash_state_s {
 
 /*****************************************************************************/
 
+void teash_init(void)
+{
+    /* XXX Is an init needed? */
+    memset(teash_state.vars, 0, sizeof(teash_state.vars));
+}
 
 /*****************************************************************************/
 /**
