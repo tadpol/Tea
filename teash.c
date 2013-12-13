@@ -144,11 +144,25 @@ int teash_var_set(int var, int value)
 }
 
 /*****************************************************************************/
+
+/**
+ * \breif Eval and exec the math/test section of a line
+ * \param[in] p Point in the line where the math starts
+ * \returns char* Point in the line where the math stopped
+ *
+ * This is a post fix math parser with builtin peek/poke commands.
+ */
 char *teash_math(char *p)
 {
-    long int st[10];
-    long int *sp = st;
-    long int a, b, pushback=1, adjust=-1;
+#ifdef __LP64__
+typedef long math_int_t;
+#else
+typedef int math_int_t;
+#endif
+    math_int_t st[10];
+    math_int_t *sp = st;
+    math_int_t a, b;
+    int pushback=1, adjust=-1;
 
     for(;*p != '\0' && *p != ']';p++) {
         a = *sp;
@@ -277,7 +291,7 @@ char *teash_math(char *p)
         }
     }
 
-    if(*sp == 0) return NULL; /* math result is FALSE, do not eval rest of p. */
+    if(*sp == 0) return NULL; /* math result is FALSE, do not eval rest of line. */
 
     if(*p == ']') p++;
     for(; isspace(*p) && *p != '\0'; p++) {} /* skip whitespace */
@@ -408,12 +422,12 @@ void teash_eval(char *line)
 
     if(*line == '[') {
         /* line is prefixed with a math test. */
-        line = teash_math(line);
+        line = teash_math(line+1);
         if(line == NULL || *line == '\0') return;
     }
 
     /* do substitutions */
-    teash_subst(line, line+TEASH_LINE_BUFFER_SIZE); // FIXME End is in wrong place.
+    teash_subst(line, line+TEASH_LINE_BUFFER_SIZE); // FIXME Line End is in wrong place.
 
     /* Break up into parameters */
     for(argc=0; *line != '\0'; line++) {
