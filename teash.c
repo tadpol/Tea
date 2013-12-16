@@ -678,7 +678,15 @@ void teash_esc_eval(void)
         printf("\x1b[D"); /* Move left */
         printf("\x1b[s"); /* Save cursor */
 
+    } else if(sscanf(teash_state.esc_sbuf, "[%u~", &a) == 1) { /* Insert key */
+        /* This would toggle between insert and overwrite. If I ever want to support that. */
+
     } else if(sscanf(teash_state.esc_sbuf, "[%u;%uR", &a, &b) == 2) {
+        /* To make this work, at start send:
+         *  \x1b[999,999f
+         *  \x1b[6n
+         * Then we'll get the response with the size of the screen.
+         */
         teash_state.screen_height = a;
         printf("\x1b[0;%ur", teash_state.screen_height - 2);/* Scrolling region is top lines */
         printf("\x1b[%u;%uf", teash_state.screen_height, teash_state.lineIdx); /* Put cursor at edit line */
@@ -709,7 +717,7 @@ void teash_inchar(int c)
         }
     } else { /* In esc sequence */
         teash_state.esc_sbuf[teash_state.escIdx++] = c;
-        if(isalnum(c)) {
+        if(isalnum(c) || c == '~') {
             teash_state.esc_sbuf[teash_state.escIdx++] = '\0';
             inesc = false;
             teash_esc_eval();
