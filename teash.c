@@ -15,19 +15,26 @@
  *
  */
 
-#define TEASH_LINE_BUFFER_SIZE  80
+#define TEASH_LINE_BUFFER_SIZE  81 /* 80 characters and a '\0' at the end */
 #define TEASH_HISTORY_DEPTH     5
 #define TEASH_PARAM_MAX         10
-#define TEASH_RETRUNSTACK_SIZE  10
 
-#define teash_status_event_0    (1<<0)
-#define teash_status_event_1    (1<<1)
-#define teash_status_event_2    (1<<2)
-#define teash_status_event_3    (1<<3)
-#define teash_status_gosub_err  (1<<4)
-#define teash_status_math_err   (1<<5)
-#define teash_status_vars_err   (1<<6)
-#define teash_status_in_event   (1<<7)
+#define teash_status_unused_0   (1<<0)
+#define teash_status_show_abi   (1<<1)
+#define teash_status_in_hex     (1<<2)
+#define teash_status_overwrite  (1<<3)
+#define teash_status_unused_2   (1<<4)
+#define teash_status_unused_3   (1<<5)
+#define teash_status_unused_4   (1<<6)
+#define teash_status_unused_5   (1<<7)
+#define teash_status_vars_err   (1<<8)
+#define teash_status_unused_6   (1<<9)
+#define teash_status_unused_7   (1<<10)
+#define teash_status_unused_8   (1<<11)
+#define teash_status_event_0    (1<<12)
+#define teash_status_event_1    (1<<13)
+#define teash_status_event_2    (1<<14)
+#define teash_status_event_3    (1<<15)
 
 typedef int(*teash_f)(int,char**);
 typedef struct teash_cmd_s teash_cmd_t;
@@ -315,6 +322,63 @@ void teash_history_load(int idx)
 
 /*****************************************************************************/
 /**
+ * \brief update status line
+ */
+void teash_update_status(void)
+{
+    int i, s = teash_var_status_get();;
+    char *numfmt = "%10d";
+    if(s & teash_status_in_hex) {
+        numfmt = "0x%08x";
+    }
+
+    printf("\x1b[%u,0f", teash_state.screen_height-1); /* move to status line */
+
+    /* Disaply status bits */
+    putchar('[');
+    for(i=0; i < 16; i++) {
+        if(s & (1<<i)) {
+            putchar(teash_statusBitMap[i]);
+        } else {
+            putchar('-');
+        }
+    }
+    putchar(']');
+
+    /* Display result code */
+    printf(" R:");
+    printf(numfmt, teash_var_get('R'));
+
+    /* Display Other vars */
+    if(s & teash_status_show_abi) {
+        /* Display A */
+        printf(" A:");
+        printf(numfmt, teash_var_get('A'));
+
+        /* Display B */
+        printf(" B:");
+        printf(numfmt, teash_var_get('B'));
+
+        /* Display I */
+        printf(" I:");
+        printf(numfmt, teash_var_get('I'));
+    }
+
+    printf("\x1b[u"); /* put cursor back */
+}
+
+/**
+ * \brief Redraw the entire current line.
+ */
+void teash_update_cmd(void)
+{
+    printf("\x1b[%u,0f", teash_state.screen_height); /* move to cmd line */
+    printf("%s", teash_state.line);
+    printf("\x1b[s"); /* Save cursor */
+    printf("\1xb[K"); /* erase to end of line */
+}
+
+/**
  * \brief Evaluate a VT100 escape sequence.
  */
 void teash_esc_eval(void)
@@ -363,6 +427,9 @@ void teash_esc_eval(void)
         printf("\x1b[0;%ur", teash_state.screen_height - 2);/* Scrolling region is top lines */
         printf("\x1b[%u;%uf", teash_state.screen_height, teash_state.lineIdx); /* Put cursor at edit line */
         printf("\x1b[s"); /* Save cursor */
+
+        /* redraw status, since it might have moved. */
+        teash_update_status();
     }
 }
 
@@ -379,9 +446,13 @@ void teash_inchar(int c)
         } else if(c == '\b') {
             teash_state.line[--teash_state.lineIdx] = '\0';
             printf("\b \b");
+            printf("\x1b[s"); /* Save cursor */
         } else if(c == '\n') {
-            teash_load_or_eval();
+            teash_history_push();
+            teash_eval(teash_state.line);
             teash_state.lineIdx = 0;
+        } else if(teash_state.lineIdx >= TEASH_LINE_BUFFER_SIZE) {
+            /* do nothing */
         } else {
             /* Insert or overwrite */
             if(teash_state.line[teash_state.lineIdx] == '\0') {
