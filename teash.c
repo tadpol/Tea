@@ -383,9 +383,23 @@ void teash_inchar(int c)
             teash_load_or_eval();
             teash_state.lineIdx = 0;
         } else {
-            teash_state.line[teash_state.lineIdx++] = c;
-            teash_state.line[teash_state.lineIdx] = '\0';
+            /* Insert or overwrite */
+            if(teash_state.line[teash_state.lineIdx] == '\0') {
+                /* in the middle of a line */
+                if(!(teash_var_status_get() & teash_status_overwrite)) {
+                    /* Insert, so make room */
+                    int left = (TEASH_LINE_BUFFER_SIZE - teash_state.lineIdx) - 1;
+                    memmove(&teash_state.line[teash_state.lineIdx+1], &teash_state.line[teash_state.lineIdx], left);
+                    teash_state.line[TEASH_LINE_BUFFER_SIZE-1] = '\0'; /* jic */
+                }
+                teash_state.line[teash_state.lineIdx++] = c;
+            } else {
+                /* Append to the end */
+                teash_state.line[teash_state.lineIdx++] = c;
+                teash_state.line[teash_state.lineIdx] = '\0';
+            }
             putchar(c);
+            printf("\x1b[s"); /* Save cursor */
         }
     } else { /* In esc sequence */
         teash_state.esc_sbuf[teash_state.escIdx++] = c;
