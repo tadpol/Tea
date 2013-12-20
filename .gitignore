@@ -2,4 +2,5 @@
 *.o
 tea-test
 teash
+.DS_Store
 
