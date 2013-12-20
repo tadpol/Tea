@@ -100,10 +100,16 @@ int teash_isvar(int var)
     return teash_var_name_to_index(var) >= 0;
 }
 
+void teash_var_status_toggle(int bits)
+{
+    /* Status is always index 0 */
+    teash_state.vars[0] ^= bits;
+}
+
 void teash_var_status_set(int bits)
 {
     /* Status is always index 0 */
-    teash_state.vars[0] |= bits;
+    teash_state.vars[0] = bits;
 }
 
 int teash_var_status_get(void)
@@ -362,6 +368,8 @@ void teash_update_status(void)
         /* Display I */
         printf(" I:");
         printf(numfmt, teash_var_get('I'));
+    } else {
+        printf("\1xb[K"); /* erase to end of line */
     }
 
     printf("\x1b[u"); /* put cursor back */
@@ -387,18 +395,12 @@ void teash_esc_eval(void)
     if(strcmp(teash_state.esc_sbuf, "[A")==0) { /* Cursor up */
         /* Replace editing line with prev line. */
         teash_history_load(-1);
-        printf("\x1b[%u;0f", teash_state.screen_height); /* Put cursor at edit line */
-        printf("%s", teash_state.line);
-        printf("\x1b[s"); /* Save cursor */
-        printf("\x1b[K"); /* Erase to end of line */
+        teash_update_cmd();
 
     } else if(strcmp(teash_state.esc_sbuf, "[B")==0) { /* Cursor down */
         /* Replace editing line with Next line. */
         teash_history_load(1);
-        printf("\x1b[%u;0f", teash_state.screen_height); /* Put cursor at edit line */
-        printf("%s", teash_state.line);
-        printf("\x1b[s"); /* Save cursor */
-        printf("\x1b[K"); /* Erase to end of line */
+        teash_update_cmd();
 
     } else if(strcmp(teash_state.esc_sbuf, "[C")==0) { /* Cursor forward */
         if(teash_state.line[teash_state.lineIdx] != '\0') {
@@ -415,7 +417,8 @@ void teash_esc_eval(void)
         printf("\x1b[s"); /* Save cursor */
 
     } else if(sscanf(teash_state.esc_sbuf, "[%u~", &a) == 1) { /* Insert key */
-        /* This would toggle between insert and overwrite. If I ever want to support that. */
+        teash_var_status_toggle(teash_status_overwrite);
+        teash_update_status();
 
     } else if(sscanf(teash_state.esc_sbuf, "[%u;%uR", &a, &b) == 2) {
         /* To make this work, at start send:
