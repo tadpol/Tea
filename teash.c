@@ -47,13 +47,7 @@ struct teash_state_s {
 
     uint8_t screen_height;
 
-    int vars[9];
-    char script[1024];
-    char *script_end;
-    char *LP;
-
-    uint16_t returnStack[TEASH_RETRUNSTACK_SIZE];
-    uint16_t *RS;
+    int vars[5];
 
     teash_cmd_t *root;
 } teash_state = {
@@ -61,19 +55,13 @@ struct teash_state_s {
     .lineIdx = 0,
     .escIdx = 0,
     .screen_height = 24,
-    .script_end = teash_state.script,
-    .LP = NULL,
-    .RS = teash_state.returnStack,
+    .vars = {0,0,0,0,0},
     .root = NULL,
 };
 
 /*****************************************************************************/
 
-void teash_init(void)
-{
-    /* XXX Is an init needed? */
-    memset(teash_state.vars, 0, sizeof(teash_state.vars));
-}
+static const char teash_statusBitMap[16] = "_axo____V___0123";
 
 /*****************************************************************************/
 /**
@@ -87,16 +75,10 @@ void teash_init(void)
  * Variable 'R' is the return value of the last execed command.
  *
  * Remaining variables are just values.
- *
- * ---
- *  I have a reoccurring thought to make XYZ special in that they will auto
- *  increment or decrement with access.  I don't know if that's a good idea
- *  or not.
- *
  */
 int teash_var_name_to_index(int var)
 {
-    const char varnames[] = "SRABCDXYZ";
+    const char varnames[] = "SRABI";
     int i;
     for(i=0; varnames[i] != '\0'; i++) {
         if(varnames[i] == var) {
@@ -151,160 +133,6 @@ int teash_var_set(int var, int value)
 /*****************************************************************************/
 
 /**
- * \breif Eval and exec the math/test section of a line
- * \param[in] p Point in the line where the math starts
- * \returns char* Point in the line where the math stopped
- *
- * This is a post fix math parser with builtin peek/poke commands.
- */
-char *teash_math(char *p)
-{
-#ifdef __LP64__
-typedef long math_int_t;
-#else
-typedef int math_int_t;
-#endif
-    math_int_t st[10];
-    math_int_t *sp = st;
-    math_int_t a, b;
-    int pushback=1, adjust=-1;
-
-    for(;*p != '\0' && *p != ']';p++) {
-        a = *sp;
-        b = *(sp-1);
-
-        if(*p >= '0' && *p <= '9') {
-            uint8_t base = 10;
-            if(*(p+1) == 'x') {
-                base = 16;
-                p += 2;
-            } else if(*(p+1) == 'b') {
-                base = 2;
-                p += 2;
-            }
-            a=0;
-            for(; *p != '\0'; p++) {
-                b = *p;
-                if( b >= '0' && b <= '9' ) b -= '0';
-                else if( b >= 'a' && b <= 'z') b = (b - 'a') + 10;
-                else if( b >= 'A' && b <= 'Z') b = (b - 'A') + 10;
-                else break;
-                if( b >= base ) break;
-                a *= base;
-                a += b;
-            }
-            adjust = 1;
-        } else if(teash_isvar(*p)) {
-            /* variable lookup */
-            adjust = 1;
-            a = (int)&teash_state.vars[teash_var_name_to_index(*p)];
-        } else if(*p == 'x') {
-            pushback = 0;
-        } else if(*p == '+') {
-            a = b + a;
-        } else if(*p == '-') {
-            a = b - a;
-        } else if(*p == '*') {
-            a = b * a;
-        } else if(*p == '/') {
-            if(a == 0) {
-                teash_var_status_set(teash_status_math_err);
-                return NULL;
-            }
-            a = b / a;
-        } else if(*p == '%') {
-            a = b % a;
-        } else if(*p == '|') {
-            a = b | a;
-        } else if(*p == '&') {
-            a = b & a;
-        } else if(*p == '^') {
-            a = b ^ a;
-        } else if(*p == '~') {
-            a = ~ a;
-            adjust = 0;
-
-        } else if( *p == '=' ) { // Test equal to ( a b -- a==b )
-            a = a == b;
-        } else if( *p == '>' ) {
-            p++;
-            if( *p == '>' ) { // Bit shift right ( a b -- b>>a )
-                a = b >> a;
-            } else if( *p == '=' ) { // Test Greater than equalto ( a b -- b>=a )
-                a = b >= a;
-            } else { // Test Greater than ( a b -- b>a )
-                a = b > a;
-                p--;
-            }
-        } else if( *p == '<' ) {
-            p++;
-            if( *p == '<' ) { // Bit shift left ( a b -- b<<a )
-                a = b << a;
-            } else if( *p == '=' ) { // Test Less Than equalto ( a b -- b<=a )
-                a = b <= a;
-            } else if( *p == '>' ) { // Test not equal to ( a b -- a<>b )
-                a = a != b;
-            } else { // Test Less Than ( a b -- b<a )
-                a = b < a;
-                p--;
-            }
-
-        } else if(*p == '@') {
-            p++;
-            adjust = 0;
-            if(*p == 'c') {
-                a = *((uint8_t*)a);
-            } else if(*p == 's') {
-                a = *((uint16_t*)a);
-            } else if(*p == 'i') {
-                a = *((uint32_t*)a);
-            } else {
-                a = *((int*)a);
-                --p;
-            }
-        } else if(*p == '!') {
-            p++;
-            adjust = -2;
-            if(*p == 'c') {
-                *((uint8_t*)a) = b;
-            } else if(*p == 's') {
-                *((uint16_t*)a) = b;
-            } else if(*p == 'i') {
-                *((uint32_t*)a) = b;
-            } else if(*p == '+') {
-                (*((int*)a)) ++;
-            } else if(*p == '-') {
-                (*((int*)a)) --;
-            } else {
-                *((int*)a) = b;
-                --p;
-            }
-        } else {
-            adjust = 0;
-            pushback = 0;
-        }
-        if(((sp+adjust) < (st-1)) || ((sp+adjust) >= (st + 10))) {
-            teash_var_status_set(teash_status_math_err);
-            return NULL;
-        }
-        sp += adjust;
-        switch(pushback) {
-            case 2: *(sp-1) = b;
-            case 1: *sp = a;
-            default:
-                break;
-        }
-    }
-
-    if(*sp == 0) return NULL; /* math result is FALSE, do not eval rest of line. */
-
-    if(*p == ']') p++;
-    for(; isspace(*p) && *p != '\0'; p++) {} /* skip whitespace */
-    return p;
-}
-/*****************************************************************************/
-
-/**
  * \breif Search for a command, and call it when found.
  */
 int teash_exec(int argc, char **argv)
@@ -338,6 +166,8 @@ int teash_exec(int argc, char **argv)
     return -1;
 }
 
+//#define INLINE_SUBST
+#ifdef INLINE_SUBST
 /**
  * \brief put ASCII form of number into stream.
  *
@@ -414,7 +244,7 @@ int teash_subst(char *b, char *be)
     *b = '\0';
     return 0;
 }
-
+#endif
 /**
  * \brief take a line, do subs, and break it into params.
  * \param[in,out] line The string to parse. This is modified heavily.
@@ -425,14 +255,10 @@ void teash_eval(char *line)
     char *end=NULL;
     int argc;
 
-    if(*line == '[') {
-        /* line is prefixed with a math test. */
-        line = teash_math(line+1);
-        if(line == NULL || *line == '\0') return;
-    }
-
+#ifdef INLINE_SUBST
     /* do substitutions */
     teash_subst(line, line+TEASH_LINE_BUFFER_SIZE); // FIXME Line End is in wrong place.
+#endif
 
     /* Break up into parameters */
     for(argc=0; *line != '\0'; line++) {
@@ -488,160 +314,6 @@ void teash_history_load(int idx)
 }
 
 /*****************************************************************************/
-/**
- * \brief Goto a line (or the next one if not exact)
- *
- * Finds a line or the next following.  If looking for line 22, but only
- * lines 20 and 25 exist, will goto line 25.
- *
- * If looking beyond the last line, stops running.
- *
- */
-void teash_goto_line(uint16_t ln)
-{
-    char *p = teash_state.script;
-    uint16_t tln;
-
-    while(p < teash_state.script_end) {
-        tln = *(uint8_t*)p++;
-        tln <<=8;
-        tln |= *(uint8_t*)p++;
-
-        if( tln >= ln ) {
-            teash_state.LP = p;
-            return;
-        }
-
-        tln = strlen(p) + 1;
-        p += tln;
-    }
-
-    teash_state.LP = NULL;
-}
-
-/**
- * \brief Jump to the next line in the script.
- */
-void teash_next_line(void)
-{
-    teash_state.LP += strlen(teash_state.LP) + 3;
-    if( teash_state.LP >= teash_state.script_end)
-        teash_state.LP = NULL;
-}
-
-/**
- * \brief How much free script space is there?
- */
-int teash_has_free(void)
-{
-    return (teash_state.script + sizeof(teash_state.script)) - teash_state.script_end;
-}
-
-/**
- * \breif load a new line into the script space
- *
- * This keeps the script space sorted by line number. Inserting and replacing
- * as needed.
- */
-int teash_load_line(uint16_t ln, char *newline)
-{
-    char *oldline = NULL;
-    uint16_t tln;
-    int oldlen=0;
-    int newlen = strlen(newline) + 3;
-
-    if(newlen == 3) /* oh, actually is deleting the whole line. */
-        newlen = 0;
-
-    /* set oldline to where we want to insert. */
-    for(oldline = teash_state.script; oldline < teash_state.script_end; ) {
-        tln  = (*(uint8_t*)oldline++) << 8;
-        tln |= *(uint8_t*)oldline++;
-        if( tln > ln ) {
-            /* inserting a new line */
-            oldlen = 0;
-            oldline -= 2;
-            break;
-        } else if( tln == ln ) {
-            /* replacing an old line */
-            oldlen = strlen(oldline) + 3;
-            oldline -= 2;
-            break;
-        }
-        /* else keep looking */
-        oldline += strlen(oldline) + 1;
-    }
-    if( oldline >= teash_state.script_end ) {
-        /* at the end, so just append. */
-        oldline = teash_state.script_end;
-        if( teash_has_free() < newlen) 
-            return -2;
-        teash_state.script_end += newlen;
-    } else if( oldlen < newlen ) {
-        /* growing */
-        if( teash_has_free() < newlen-oldlen) 
-            return -2;
-
-        memmove(oldline+newlen, oldline+oldlen, teash_state.script_end - oldline+oldlen);
-
-        teash_state.script_end += newlen-oldlen; /* grew by this much */
-    } else if( oldlen > newlen ) {
-        /* shrinking */
-        memmove(oldline+newlen, oldline+oldlen, teash_state.script_end - oldline+oldlen);
-
-        teash_state.script_end -= oldlen-newlen; /*shrunk by this much */
-    }
-    /* its the right size! */
-
-    /* now we can copy it in (unless there is nothing to copy) */
-    if( newlen > 3 ) {
-        *(uint8_t*)oldline++ = (ln >> 8)&0xff;
-        *(uint8_t*)oldline++ = ln & 0xff;
-        strcpy(oldline, newline);
-    }
-
-    return 0;
-}
-
-/** 
- * \breif take a line from user input and figure out what to do
- *
- * Lines are ether executed or loaded into script memory.
- */
-void teash_load_or_eval(void)
-{
-    char *p;
-    int ln;
-
-    /* trim whitespace on tail */
-    for(p=teash_state.line; *p != '\0'; p++) {} /* goto end */
-    for(p--; isspace(*p); p--) {} /* back up over whitespaces */
-    *(++p) = '\0'; /* end the line */
-
-    /* skip whitespace */
-    for(p=teash_state.line; isspace(*p) && *p != '\0'; p++) {}
-    if( *p == '\0' ) return;
-
-    /* is first word a number? */
-    for(ln=0; isdigit(*p) && *p != '\0'; p++) {
-        ln *= 10;
-        ln += *p - '0';
-    }
-    if( isspace(*p) || *p == '\0' ) {
-        for(; isspace(*p) && *p != '\0'; p++) {} /* skip whitespace */
-        teash_load_line(ln, p);
-    }
-    teash_history_push();
-    teash_eval(p);
-
-    /* Check to see if we should be running script code */
-    while(teash_state.LP != NULL) {
-        strcpy(teash_state.line, teash_state.LP);
-        teash_next_line(); /* Set up LP for the next line after this one */
-        teash_eval(teash_state.line);
-    }
-}
-
 /**
  * \brief Evaluate a VT100 escape sequence.
  */
@@ -726,66 +398,14 @@ void teash_inchar(int c)
 }
 
 /*****************************************************************************/
-/**
- * \brief Goto, Gosub, Return, Run, and End all together since they're mostly the same
- *
- * This jumps to the next equal-or-greater line. (or to the end.)
- *
- * FE: if the script only has lines 10 and 20, and sees a "goto 15", it will
- * jump to line 20.  If it sees a "goto 30", then it stops. (it jumped off
- * the end of the script.) This is the same for gosub.
- *
- * This is written so that it works from the command prompt.  It jumps into 
- * the script to the line requested.  
- *
- * The difference between goto and gosub is that gosub pushes the next line 
- * onto the return stack. (unless the return stack is full)
- *
- * Return pops the return stack and goes to that line.  If the return stack 
- * is empty, return exits the script and goes to the command prompt.
- *
- * Run resets the return stack and otherwise is identical to "goto 0"
- *
- * End stops the script
- */
-int teash_gojump(int argc, char **argv)
+
+void teash_init(teash_cmd_t *commands)
 {
-    int ln = 0;
-    int ret = 0;
-    if(argc > 1) {
-        ln = strtoul(argv[1], NULL, 0);
-    }
+    teash_state.root = commands;
 
-    if( argv[0][0] == 'e' ) { /* called as 'End' */
-        ret = ln; /* argv[1] is actually return value */
-        teash_state.LP = NULL;
-        return ret;
-    } else if( argv[0][1] == 'u' ) { /* called as 'rUn' */
-        teash_state.RS = teash_state.returnStack; /* reset RS */
-        ln = 0;
-    } else if( argv[0][1] == 'e' ) { /* called as 'rEturn' */
-        ret = ln; /* argv[1] is actually return value */
-        if(teash_state.RS <= teash_state.returnStack) {
-            return ret;
-        } else {
-            teash_state.RS--;
-            ln = *(teash_state.RS);
-        }
-    } else if(argv[0][2] == 's') { /* called as 'goSub' */
-        if(teash_state.RS > &teash_state.returnStack[TEASH_RETRUNSTACK_SIZE]) {
-            teash_var_status_set(teash_status_gosub_err);
-            return -2; /* no return stack space left. */
-        }
-        if(teash_state.LP) {
-            /* LP is the next line to run, not current. */
-            *(teash_state.RS) = (*(teash_state.LP-2) <<8) | *(teash_state.LP-1);
-            teash_state.RS++;
-        }
-    }
-    /* else is goto. */
-
-    teash_goto_line(ln);
-    return ret;
+    printf("\1xb[7l"); /* Disable line wrapping */
+    printf("\x1b[999,999f"); /* Put cursor somewhere hopefully off the screen */
+    printf("\x1b[6n"); /* ask terminal where cursor ended up */
 }
 
 /*****************************************************************************/
