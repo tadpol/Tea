@@ -405,16 +405,16 @@ void teash_esc_eval(void)
     } else if(strcmp(teash_state.esc_sbuf, "[C")==0) { /* Cursor forward */
         if(teash_state.line[teash_state.lineIdx] != '\0') {
             teash_state.lineIdx++;
+            printf("\x1b[C"); /* Move right */
+            printf("\x1b[s"); /* Save cursor */
         }
-        printf("\x1b[C"); /* Move right */
-        printf("\x1b[s"); /* Save cursor */
 
     } else if(strcmp(teash_state.esc_sbuf, "[D")==0) { /* Cursor backward */
         if(teash_state.lineIdx > 0) {
             teash_state.lineIdx--;
+            printf("\x1b[D"); /* Move left */
+            printf("\x1b[s"); /* Save cursor */
         }
-        printf("\x1b[D"); /* Move left */
-        printf("\x1b[s"); /* Save cursor */
 
     } else if(strcmp(teash_state.esc_sbuf, "[2~")==0) { /* Insert key */
         teash_var_status_toggle(teash_status_overwrite);
