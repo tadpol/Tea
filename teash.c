@@ -462,7 +462,7 @@ void teash_inchar(int c)
                 printf("\x1b[u"); /* put cursor back */
             }
 
-        } else if(c == '\n') {
+        } else if(c == '\n' || c == '\r') {
             teash_history_push();
             teash_eval(teash_state.line);
             teash_state.lineIdx = 0;
