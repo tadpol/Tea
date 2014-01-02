@@ -338,7 +338,7 @@ void teash_update_status(void)
         numfmt = "0x%08x";
     }
 
-    printf("\x1b[%u,0f", teash_state.screen_height-1); /* move to status line */
+    printf("\x1b[%u;0f", teash_state.screen_height-1); /* move to status line */
 
     /* Disaply status bits */
     putchar('[');
@@ -369,7 +369,7 @@ void teash_update_status(void)
         printf(" I:");
         printf(numfmt, teash_var_get('I'));
     } else {
-        printf("\1xb[K"); /* erase to end of line */
+        printf("\x1b[K"); /* erase to end of line */
     }
 
     printf("\x1b[u"); /* put cursor back */
@@ -380,10 +380,10 @@ void teash_update_status(void)
  */
 void teash_update_cmd(void)
 {
-    printf("\x1b[%u,0f", teash_state.screen_height); /* move to cmd line */
+    printf("\x1b[%u;0f", teash_state.screen_height); /* move to cmd line */
     printf("%s", teash_state.line);
     printf("\x1b[s"); /* Save cursor */
-    printf("\1xb[K"); /* erase to end of line */
+    printf("\x1b[K"); /* erase to end of line */
 }
 
 /**
@@ -491,8 +491,8 @@ void teash_init(teash_cmd_t *commands)
 {
     teash_state.root = commands;
 
-    printf("\1xb[7l"); /* Disable line wrapping */
-    printf("\x1b[999,999f"); /* Put cursor somewhere hopefully off the screen */
+    printf("\x1b[7l"); /* Disable line wrapping */
+    printf("\x1b[999;999f"); /* Put cursor somewhere hopefully off the screen */
     printf("\x1b[6n"); /* ask terminal where cursor ended up */
 }
 
