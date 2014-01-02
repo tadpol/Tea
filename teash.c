@@ -44,6 +44,7 @@ struct teash_cmd_s {
     teash_cmd_t *sub;
 };
 
+#define TEASH_VARS_CNT  5
 struct teash_state_s {
     int historyIdx;
     char history[TEASH_HISTORY_DEPTH][TEASH_LINE_BUFFER_SIZE];
@@ -54,7 +55,7 @@ struct teash_state_s {
 
     uint8_t screen_height;
 
-    int vars[5];
+    int vars[TEASH_VARS_CNT];
 
     teash_cmd_t *root;
 } teash_state = {
@@ -85,7 +86,7 @@ static const char teash_statusBitMap[16] = "_axo____V___0123";
  */
 int teash_var_name_to_index(int var)
 {
-    const char varnames[] = "SRABI";
+    const char varnames[TEASH_VARS_CNT+1] = "SRABI";
     int i;
     for(i=0; varnames[i] != '\0'; i++) {
         if(varnames[i] == var) {
@@ -126,7 +127,7 @@ int teash_var_status_test(int bits)
 int teash_var_get(int var)
 {
     int idx = teash_var_name_to_index(var);
-    if(idx < 0) {
+    if(idx < 0 || idx >= TEASH_VARS_CNT) {
         teash_var_status_set(teash_status_vars_err);
         return 0;
     }
@@ -136,7 +137,7 @@ int teash_var_get(int var)
 int teash_var_set(int var, int value)
 {
     int idx = teash_var_name_to_index(var);
-    if(idx < 0) {
+    if(idx < 0 || idx >= TEASH_VARS_CNT) {
         teash_var_status_set(teash_status_vars_err);
         return 0;
     }
