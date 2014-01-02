@@ -416,7 +416,7 @@ void teash_esc_eval(void)
         printf("\x1b[D"); /* Move left */
         printf("\x1b[s"); /* Save cursor */
 
-    } else if(sscanf(teash_state.esc_sbuf, "[%u~", &a) == 1) { /* Insert key */
+    } else if(strcmp(teash_state.esc_sbuf, "[2~")==0) { /* Insert key */
         teash_var_status_toggle(teash_status_overwrite);
         teash_update_status();
 
@@ -447,9 +447,21 @@ void teash_inchar(int c)
             inesc = true;
             teash_state.escIdx = 0;
         } else if(c == '\b') {
-            teash_state.line[--teash_state.lineIdx] = '\0';
             printf("\b \b");
             printf("\x1b[s"); /* Save cursor */
+
+            if(teash_state.line[teash_state.lineIdx--] == '\0') {
+                /* at the end */
+                teash_state.line[teash_state.lineIdx] = '\0';
+            } else {
+                /* In middle */
+                int left = (TEASH_LINE_BUFFER_SIZE - teash_state.lineIdx) - 1;
+                memmove(&teash_state.line[teash_state.lineIdx], &teash_state.line[teash_state.lineIdx+1], left);
+                printf("%s", &teash_state.line[teash_state.lineIdx]); /* rewrite the moved chars */
+                printf("\x1b[K"); /* erase to end of line */
+                printf("\x1b[u"); /* put cursor back */
+            }
+
         } else if(c == '\n') {
             teash_history_push();
             teash_eval(teash_state.line);
@@ -458,22 +470,30 @@ void teash_inchar(int c)
             /* do nothing */
         } else {
             /* Insert or overwrite */
-            if(teash_state.line[teash_state.lineIdx] != '\0') {
-                /* in the middle of a line */
-                if(!(teash_var_status_get() & teash_status_overwrite)) {
-                    /* Insert, so make room */
-                    int left = (TEASH_LINE_BUFFER_SIZE - teash_state.lineIdx) - 1;
-                    memmove(&teash_state.line[teash_state.lineIdx+1], &teash_state.line[teash_state.lineIdx], left);
-                    teash_state.line[TEASH_LINE_BUFFER_SIZE-1] = '\0'; /* jic */
-                }
-                teash_state.line[teash_state.lineIdx++] = c;
-            } else {
+            if(teash_state.line[teash_state.lineIdx] == '\0') {
                 /* Append to the end */
                 teash_state.line[teash_state.lineIdx++] = c;
                 teash_state.line[teash_state.lineIdx] = '\0';
+                putchar(c);
+                printf("\x1b[s"); /* Save cursor */
+            } else if((teash_var_status_get() & teash_status_overwrite)) {
+                /* Overwriting in the middle */
+                teash_state.line[teash_state.lineIdx++] = c;
+                putchar(c);
+                printf("\x1b[s"); /* Save cursor */
+
+            } else {
+                /* Inserting in the middle of a line */
+                /* So make room */
+                int left = (TEASH_LINE_BUFFER_SIZE - teash_state.lineIdx) - 1;
+                memmove(&teash_state.line[teash_state.lineIdx+1], &teash_state.line[teash_state.lineIdx], left);
+                teash_state.line[TEASH_LINE_BUFFER_SIZE-1] = '\0'; /* jic */
+                teash_state.line[teash_state.lineIdx++] = c;
+                putchar(c);
+                printf("\x1b[s"); /* Save cursor */
+                printf("%s", &teash_state.line[teash_state.lineIdx]); /* rewrite the moved chars */
+                printf("\x1b[u"); /* put cursor back */
             }
-            putchar(c);
-            printf("\x1b[s"); /* Save cursor */
         }
     } else { /* In esc sequence */
         teash_state.esc_sbuf[teash_state.escIdx++] = c;
@@ -491,6 +511,7 @@ void teash_init(teash_cmd_t *commands)
 {
     teash_state.root = commands;
 
+    printf("\x1b[2J"); /* Clear Screen */
     printf("\x1b[7l"); /* Disable line wrapping */
     printf("\x1b[999;999f"); /* Put cursor somewhere hopefully off the screen */
     printf("\x1b[6n"); /* ask terminal where cursor ended up */
