@@ -477,7 +477,7 @@ void teash_inchar(int c)
         }
     } else { /* In esc sequence */
         teash_state.esc_sbuf[teash_state.escIdx++] = c;
-        if(isalnum(c) || c == '~') {
+        if(isalpha(c) || c == '~') {
             teash_state.esc_sbuf[teash_state.escIdx++] = '\0';
             inesc = false;
             teash_esc_eval();
