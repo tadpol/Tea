@@ -458,7 +458,7 @@ void teash_inchar(int c)
             /* do nothing */
         } else {
             /* Insert or overwrite */
-            if(teash_state.line[teash_state.lineIdx] == '\0') {
+            if(teash_state.line[teash_state.lineIdx] != '\0') {
                 /* in the middle of a line */
                 if(!(teash_var_status_get() & teash_status_overwrite)) {
                     /* Insert, so make room */
