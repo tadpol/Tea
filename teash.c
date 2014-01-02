@@ -467,6 +467,9 @@ void teash_inchar(int c)
             teash_history_push();
             teash_eval(teash_state.line);
             teash_state.lineIdx = 0;
+            teash_state.line[0] = '\0';
+            teash_update_cmd();
+            teash_update_status();
         } else if(teash_state.lineIdx >= TEASH_LINE_BUFFER_SIZE) {
             /* do nothing */
         } else {
