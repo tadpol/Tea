@@ -46,11 +46,11 @@ struct teash_cmd_s {
 
 #define TEASH_VARS_CNT  5
 struct teash_state_s {
-    int historyIdx;
+    uint8_t historyIdx;
     char history[TEASH_HISTORY_DEPTH][TEASH_LINE_BUFFER_SIZE];
     char line[TEASH_LINE_BUFFER_SIZE];
     uint8_t lineIdx;
-    char esc_sbuf[25];
+    char esc_sbuf[11];
     uint8_t escIdx;
 
     uint8_t screen_height;
@@ -526,6 +526,8 @@ void teash_init(teash_cmd_t *commands)
 int main(int argc, char **argv)
 {
     int c;
+
+    teash_init(NULL);
 
     while((c=getchar()) != EOF) {
         teash_inchar(c);
