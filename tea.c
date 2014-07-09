@@ -1,22 +1,11 @@
 /**
- * \file tea18.c
+ * \file tea.c
  *
- * A tiny litle language designed with the following goals:
- * - Small ROM/RAM useage
- * - Powerful
- * - Portable
- * - Usable
+ * MMTea : More Math Tea
  *
- * Primarily driven as something I use on little systems and attached
- * to someone else's shell type environment.
+ * I needed a tight little calculator thingy for embeded systems.
  *
  * ---------
- *
- * Looping:
- * - Very basic looping.
- * - Can NOT nest loops.
- * - Cannot span commands (even though the stack does)
- * - Think "do {} while()" from C
  *
  * Conditional:
  * - Skip if false.
@@ -27,11 +16,6 @@
  * Unrecognized charaters in the command string are ignored and skipped
  * over. This allows for using whitespace for readablity.
  *
- * Memory access byte order is whatever the CPU is.
- *
- * The stack is static, so it remains between calls.
- *
- * Always returns the top of the stack. (without popping it.)
  *
  * There is no error checking; it makes things faster and smaller.
  * You need to be smart.
@@ -44,7 +28,7 @@
  *
  *
  *
- * Copyright (c) 2012 Michael Conrad Tadpol Tilstra 
+ * Copyright (c) 2012-2014 Michael Conrad Tadpol Tilstra 
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software
  * and associated documentation files (the "Software"), to deal in the Software without
@@ -61,25 +45,108 @@
  * DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#include <string.h>
-#ifdef USE_STDOUT
-#include <stdio.h>
-#define tea_printf printf
-#else
-#define tea_printf(...) do{}while(0)
-#endif
+
+
+
+float tea_eval(char *cmd, float adc)
+{
+    register float x, y, s;
+    float v[4];
+
+    for(; *cmd != '\0'; cmd++ ) {
+        if(*cmd=='s') { // Swap
+            s = y;
+            y = x;
+            x = s;
+        }else
+        if(*cmd=='@') { // Load
+            if(*(cmd+1)>='A'&&*(cmd+1)<='D') {
+                cmd++;
+                x = v['A' - *cmd];
+            }
+        }else
+        if(*cmd=='!') { // Store
+            if(*(cmd+1)>='A'&&*(cmd+1)<='D') {
+                cmd++;
+                v['A' - *cmd] = x;
+            }
+        }
+        if( *cmd == '+' ) { // add
+            x = y + x;
+        } else
+        if( *cmd == '-' ) { // sub
+            x = y - x;
+        } else
+        if( *cmd == '*' ) { // multiply
+            x = y * x;
+        } else
+        if( *cmd == '/' ) { // divide
+            x = y / x;
+        } else
+        if( *cmd == '%' ) { // modulo
+            x = y % x;
+        } else
+        if(*cmd=='|') { // abs
+            x = abs(x);
+        }else
+        if(*cmd=='a') {
+            cmd++;
+            if(*cmd == 'c') { // acos
+                x = acos(x);
+            }else
+            if(*cmd == 's') { // asin
+                x = asin(x);
+            }else
+            if(*cmd == 't') { // atan
+                x = atan(x);
+            }else
+            if(*cmd == '2') { // atan2
+                x = atan2(x,y);
+            }else {
+                cmd--;
+            }
+        } else
+        if(*cmd=='c') {
+ceil arg
+cos arg
+cosh arg
+        }else
+        if(*cmd=='e') { // exp
+            x = exp(x);
+        }else
+        if(*cmd=='h') { // hypot
+            x = hypot(x);
+        }else
+        if(*cmd=='^') { // pow
+            x = pow(x,y)
+        }else
+        if(*cmd=='r') { //round
+            x = round(x);
+        }else
+        if(*cmd=='') {
+        }else
+
+
+
+log arg
+log10 arg
+sin arg
+sinh arg
+sqrt arg
+tan arg
+tanh arg
+
+    }
+}
+
+
+
+
 
 typedef unsigned long teaint; /*!< a 64 bit number */
 //typedef unsigned int teaint; /*!< a 32 bit number */
 typedef unsigned short teashort; /*!< a 16 bit number */
 typedef unsigned char teabyte; /*!< a 8 bit number */
-
-#define USE_DICT
-#ifdef USE_DICT
-teabyte tea_dict_base[2024];
-teabyte *tea_dict_head = tea_dict_base;
-#define alignPointer(p) (p) = ((void*)(((teaint)(p)+sizeof(teaint)-1UL)&~(sizeof(teaint)-1UL)))
-#endif
 
 /**
  * How big is the stack
@@ -87,16 +154,6 @@ teabyte *tea_dict_head = tea_dict_base;
 #define tea_stack_depth 10
 teaint tea_stack[tea_stack_depth];
 teaint *tea_SP = tea_stack;
-
-/* XXX These need to move out into a header. */
-/**
- * Push a number onto the stack
- */
-#define tea_push(t) (*(++tea_SP) = (t))
-/**
- * Pop a number off of the stack
- */
-#define tea_pop() (*tea_SP--)
 
 /**
  * Operate on a command string and return the top of the stack.
@@ -108,7 +165,7 @@ teaint *tea_SP = tea_stack;
  *
  * \return The value that is at the top of the stack.
  */
-teaint tea_eval(char* cmd)
+teaint tea_eval(char* cmd, float *params)
 {
     /* Try to do as much work in registers instead of always doing pop and
      * push.  All but a few commands work with three or less items from the
