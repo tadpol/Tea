@@ -298,6 +298,7 @@ static float expr3(void)
 	float a,b;
 
 	a = expr4();
+    ignore_blanks();
 	while(1) {
 		if(*txtpos == '^') {
 			txtpos++;
