@@ -23,6 +23,8 @@ int main(int argc, char **argv)
     assert(-42.0f == tea_calc("-42", NULL));
     assert(42.0f == tea_calc("--42", NULL));
     assert(42.0f == tea_calc("----42", NULL));
+    assert(42.0f == tea_calc("(42)", NULL));
+    assert(42.0f == tea_calc("(((42)))", NULL));
     assert(0.1256f == tea_calc("0.1256", NULL));
     assert(isnan(tea_calc("nan", NULL)));
     assert(isnan(tea_calc("NAN", NULL)));
@@ -47,6 +49,15 @@ int main(int argc, char **argv)
     assert(27.0f == tea_calc("45 - 6 * 3", NULL));
     assert(27.0f == tea_calc("45 - (6 * 3)", NULL));
     assert(117.0f == tea_calc("(45 - 6) * 3", NULL));
+
+    assert(isnan(tea_calc("5 + ( 6", NULL)));
+    assert(isnan(tea_calc("bobble(6)", NULL)));
+    assert(isnan(tea_calc("bobble(6, 9)", NULL)));
+    assert(isnan(tea_calc("tan(6", NULL)));
+    assert(isnan(tea_calc("pow(6", NULL)));
+    assert(isnan(tea_calc("pow(6,", NULL)));
+    assert(isnan(tea_calc("pow(6,8", NULL)));
+
 
     constants[0] = 200.0f;
     constants[1] = 55.0f;
