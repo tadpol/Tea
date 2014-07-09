@@ -1,10 +1,10 @@
 
-CFLAGS+= -Os -lm
+CFLAGS+= -Os
 
 all: tea-test
 
 tea-test: tea.o main.o
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 	@ls -lh
 
 test: tea-test
