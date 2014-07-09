@@ -59,6 +59,12 @@ int main(int argc, char **argv)
     assert(81.0f == tea_calc("pow(9,2)", NULL));
     assert(81.0f == tea_calc(" pow ( 9 , 2 ) ", NULL));
 
+    constants[0] = 4234.0f;
+    constants[1] = 4050.0f;
+    constants[2] = 47000.0f;
+    constants[3] = 56000.0f;
+    assert(19.762970f == tea_calc("B/log(D*A/(8191-A)/(C*exp(-B/298.15)))-273.15", constants));
+
     puts("All tests passed.");
     return 0;
 }
