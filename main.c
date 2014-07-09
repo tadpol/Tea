@@ -5,6 +5,7 @@
  */
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 #include "tea.h"
 
 int main(int argc, char **argv)
