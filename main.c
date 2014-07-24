@@ -45,6 +45,10 @@ int main(int argc, char **argv)
 
     assert(81.0f == tea_calc("9^2", NULL));
 
+    // TODO: Add tests for >= <= != == < >
+    // TODO: Add tests for && ||
+    // TODO: Add tests for assignment
+
     assert(21.0f == tea_calc("7 * 4 - 7", NULL));
     assert(27.0f == tea_calc("45 - 6 * 3", NULL));
     assert(27.0f == tea_calc("45 - (6 * 3)", NULL));
