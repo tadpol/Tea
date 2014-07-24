@@ -22,7 +22,18 @@
 
 static char *txtpos; // initialize with command buffer.
 static float vars[TEA_VARS_COUNT];
-
+/*
+static unsigned char func_tab[] PROGMEM = {
+    max,
+    min,
+    sum,
+    pop,
+    0
+};
+enum {
+    FN0_UNKNOWN
+};
+*/
 static unsigned char func_tab[] PROGMEM = {
     'a','b','s'+0x80,
     'a','c','o','s'+0x80,
@@ -44,6 +55,10 @@ static unsigned char func_tab[] PROGMEM = {
     'a','t','a','n','2'+0x80,
     'h','y','p','o','t'+0x80,
     'p','o','w'+0x80,
+/*
+    push,
+    trim,
+*/
     0
 };
 enum {
@@ -435,15 +450,18 @@ float expr7(void)
     // A = expr
     int var;
     float a;
+    char *bounce;
 
     ignore_blanks();
+    bounce = txtpos;
     var = getVariableIndex();
     if( var < 0) {
-        return NAN;
+        return expr6();
     }
     ignore_blanks();
     if(*txtpos != '=') {
-        return NAN;
+        txtpos = bounce;
+        return expr6();
     }
     txtpos++;
     a = expr6();
