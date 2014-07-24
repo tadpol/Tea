@@ -1,5 +1,6 @@
 
 CFLAGS+= -Os
+#CFLAGS+= -g
 
 all: tea-test
 

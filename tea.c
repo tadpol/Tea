@@ -20,20 +20,20 @@
 #include <avr/pgmspace.h>
 #endif /*AVR*/
 
+#define HAS_RING 1
+
 static char *txtpos; // initialize with command buffer.
 static float vars[TEA_VARS_COUNT];
-/*
-static unsigned char func_tab[] PROGMEM = {
-    max,
-    min,
-    sum,
-    pop,
-    0
-};
-enum {
-    FN0_UNKNOWN
-};
-*/
+
+#ifdef HAS_RING
+#include <float.h>
+static struct ring_s {
+    char size;
+    char idx;
+    float r[10];
+} ring;
+#endif /*HAS_RING*/
+
 static unsigned char func_tab[] PROGMEM = {
     'a','b','s'+0x80,
     'a','c','o','s'+0x80,
@@ -55,10 +55,14 @@ static unsigned char func_tab[] PROGMEM = {
     'a','t','a','n','2'+0x80,
     'h','y','p','o','t'+0x80,
     'p','o','w'+0x80,
-/*
-    push,
-    trim,
-*/
+#ifdef HAS_RING
+    'r','i','n','g'+0x80,
+    'i','n','s','e','r','t'+0x80,
+    'm','a','x'+0x80,
+    'm','i','n'+0x80,
+    's','u','m'+0x80,
+#endif /*HAS_RING*/
+
     0
 };
 enum {
@@ -82,6 +86,13 @@ enum {
     FN_atan2,
     FN_hypot,
     FN_pow,
+#ifdef HAS_RING
+    FN_ring,
+    FN_insert,
+    FN_max,
+    FN_min,
+    FN_sum,
+#endif /*HAS_RING*/
     FN_UNKNOWN,
 };
 
@@ -242,6 +253,43 @@ float doFunction(int fidx)
             b = expr8();
             a = powf(a, b);
             break;
+
+#ifdef HAS_RING
+        case FN_ring:
+            a = expr8();
+            ring.size = a;
+            ring.idx = 0;
+            break;
+        case FN_insert:
+            a = expr8();
+            ring.r[ring.idx++] = a;
+            if (ring.idx >= ring.size) {
+                ring.idx = 0;
+            }
+            break;
+        case FN_max:
+            a = -DBL_MAX;
+            for(int i=0; i < ring.size; i++) {
+                if(ring.r[i] > a) {
+                    a = ring.r[i];
+                }
+            }
+            break;
+        case FN_min:
+            a = DBL_MAX;
+            for(int i=0; i < ring.size; i++) {
+                if(ring.r[i] < a) {
+                    a = ring.r[i];
+                }
+            }
+            break;
+        case FN_sum:
+            a = 0;
+            for(int i=0; i < ring.size; i++) {
+                a += ring.r[i];
+            }
+            break;
+#endif /*HAS_RING*/
 
         default:
             a = NAN;
