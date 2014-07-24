@@ -13,9 +13,11 @@
 #include <math.h>
 #include "tea.h"
 
-#ifndef AVR // TODO: what is the correct define for this?
+#ifndef AVR
 #define PROGMEM
 #define pgm_read_byte(x) *(x)
+#else /*AVR*/
+#include <avr/pgmspace.h>
 #endif /*AVR*/
 
 static char *txtpos; // initialize with command buffer.
@@ -74,10 +76,10 @@ enum {
     FN2_UNKNOWN,
 };
 
-static float expr1(void);
+float expr8(void);
 
 /***************************************************************************/
-static void ignore_blanks(void)
+void ignore_blanks(void)
 {
     while(*txtpos == ' ' || *txtpos == '\t') {
         txtpos++;
@@ -85,7 +87,7 @@ static void ignore_blanks(void)
 }
 
 /***************************************************************************/
-static int scantable(unsigned char *table)
+int scantable(unsigned char *table)
 {
 	int i = 0;
 	int table_index = 0;
@@ -123,7 +125,7 @@ static int scantable(unsigned char *table)
 }
 
 /***************************************************************************/
-static float singleFunc(int tidx)
+float singleFunc(int tidx)
 {
     float a;
 
@@ -132,7 +134,7 @@ static float singleFunc(int tidx)
     }
 
     txtpos++;
-    a = expr1();
+    a = expr8();
     if(*txtpos != ')') {
         return NAN;
     }
@@ -197,7 +199,7 @@ static float singleFunc(int tidx)
 }
 
 /***************************************************************************/
-static float doubleFunc(int tidx)
+float doubleFunc(int tidx)
 {
     float a,b;
 
@@ -205,12 +207,12 @@ static float doubleFunc(int tidx)
         return NAN;
     }
     txtpos++;
-    a = expr1();
+    a = expr8();
     if(*txtpos != ',') {
         return NAN;
     }
     txtpos++;
-    b = expr1();
+    b = expr8();
     if(*txtpos != ')') {
         return NAN;
     }
@@ -233,14 +235,14 @@ static float doubleFunc(int tidx)
 }
 
 /***************************************************************************/
-static float expr4(void)
+float expr1(void)
 {
     float a;
     ignore_blanks();
 
 	if(*txtpos == '-') {
         txtpos++;
-        return -expr4();
+        return -expr1();
     }
 
     // Load numbers
@@ -280,7 +282,7 @@ static float expr4(void)
 
 	if(*txtpos == '(') {
 		txtpos++;
-		a = expr1();
+		a = expr8();
 		if(*txtpos != ')') {
             return NAN;
         }
@@ -293,16 +295,16 @@ static float expr4(void)
 }
 
 /***************************************************************************/
-static float expr3(void)
+float expr2(void)
 {
 	float a,b;
 
-	a = expr4();
+	a = expr1();
     ignore_blanks();
 	while(1) {
 		if(*txtpos == '^') {
 			txtpos++;
-			b = expr4();
+			b = expr1();
             a = powf(a, b);
 		} else {
 			return a;
@@ -311,20 +313,20 @@ static float expr3(void)
 }
 
 /***************************************************************************/
-static float expr2(void)
+float expr3(void)
 {
 	float a,b;
 
-	a = expr3();
+	a = expr2();
     ignore_blanks();
 	while(1) {
 		if(*txtpos == '*') {
 			txtpos++;
-			b = expr3();
+			b = expr2();
 			a *= b;
 		} else if(*txtpos == '/') {
 			txtpos++;
-			b = expr3();
+			b = expr2();
 			if(b != 0) {
 				a /= b;
             } else {
@@ -332,7 +334,7 @@ static float expr2(void)
             }
         } else if(*txtpos == '%') {
             txtpos++;
-			b = expr3();
+			b = expr2();
             a = fmodf(a,b);
 		} else {
 			return a;
@@ -341,29 +343,100 @@ static float expr2(void)
 }
 
 /***************************************************************************/
-static float expr1(void)
+float expr4(void)
 {
 	float a,b;
 
 	if(*txtpos == '-' || *txtpos == '+') {
 		a = 0;
     } else {
-		a = expr2();
+		a = expr3();
+        ignore_blanks();
     }
 
 	while(1) {
 		if(*txtpos == '-') {
 			txtpos++;
-			b = expr2();
+			b = expr3();
 			a -= b;
 		} else if(*txtpos == '+') {
 			txtpos++;
-			b = expr2();
+			b = expr3();
 			a += b;
 		} else {
 			return a;
         }
 	}
+}
+
+/***************************************************************************/
+float expr5(void)
+{
+    float a;
+
+	a = expr4();
+    ignore_blanks();
+	while(1) {
+		if(txtpos[0] == '&' && txtpos[1] == '&') {
+			txtpos+=2;
+			a = (a && expr4());
+		} else if(txtpos[0] == '|' && txtpos[1] == '|') {
+			txtpos+=2;
+            a = (a || expr4());
+		} else {
+			return a;
+        }
+	}
+}
+
+/***************************************************************************/
+float expr6(void)
+{
+    float a,b;
+
+	a = expr5();
+    ignore_blanks();
+	while(1) {
+		if(txtpos[0] == '<' && txtpos[1] == '=') {
+			txtpos+=2;
+            b = expr5();
+            a = (a <= b);
+		} else if(txtpos[0] == '>' && txtpos[1] == '=') {
+			txtpos+=2;
+            b = expr5();
+            a = (a >= b);
+		} else if(txtpos[0] == '!' && txtpos[1] == '=') {
+			txtpos+=2;
+            b = expr5();
+            a = (a != b);
+		} else if(txtpos[0] == '=' && txtpos[1] == '=') {
+			txtpos++;
+            b = expr5();
+            a = (a == b);
+		} else if(txtpos[0] == '<') {
+			txtpos++;
+            b = expr5();
+            a = (a < b);
+		} else if(txtpos[0] == '>') {
+			txtpos++;
+            b = expr5();
+            a = (a > b);
+		} else {
+			return a;
+        }
+	}
+}
+
+/***************************************************************************/
+float expr7(void)
+{
+    return expr6();
+}
+
+/***************************************************************************/
+float expr8(void)
+{
+    return expr7();
 }
 
 /***************************************************************************/
@@ -377,7 +450,7 @@ float tea_calc(char *command, float constants[TEA_VARS_COUNT])
         memset(vars, 0, sizeof(vars));
     }
 
-    return expr1();
+    return expr8();
 }
 
 
