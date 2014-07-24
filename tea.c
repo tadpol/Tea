@@ -372,17 +372,19 @@ float expr4(void)
 /***************************************************************************/
 float expr5(void)
 {
-    float a;
+    float a,b;
 
 	a = expr4();
     ignore_blanks();
 	while(1) {
 		if(txtpos[0] == '&' && txtpos[1] == '&') {
 			txtpos+=2;
-			a = (a && expr4());
+            b = expr4();
+			a = (a && b);
 		} else if(txtpos[0] == '|' && txtpos[1] == '|') {
 			txtpos+=2;
-            a = (a || expr4());
+            b = expr4();
+            a = (a || b);
 		} else {
 			return a;
         }
