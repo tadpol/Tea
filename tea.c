@@ -432,7 +432,24 @@ float expr6(void)
 /***************************************************************************/
 float expr7(void)
 {
-    return expr6();
+    // A = expr
+    int var;
+    float a;
+
+    ignore_blanks();
+    var = getVariableIndex();
+    if( var < 0) {
+        return NAN;
+    }
+    ignore_blanks();
+    if(*txtpos != '=') {
+        return NAN;
+    }
+    txtpos++;
+    a = expr6();
+    vars[var] = a;
+
+    return a;
 }
 
 /***************************************************************************/
