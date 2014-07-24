@@ -41,6 +41,9 @@ static unsigned char func_tab[] PROGMEM = {
     's','q','r','t'+0x80,
     't','a','n'+0x80,
     't','a','n','h'+0x80,
+    'a','t','a','n','2'+0x80,
+    'h','y','p','o','t'+0x80,
+    'p','o','w'+0x80,
     0
 };
 enum {
@@ -61,19 +64,10 @@ enum {
     FN_sqrt,
     FN_tan,
     FN_tanh,
+    FN_atan2,
+    FN_hypot,
+    FN_pow,
     FN_UNKNOWN,
-};
-static unsigned char func2_tab[] PROGMEM = {
-    'a','t','a','n','2'+0x80,
-    'h','y','p','o','t'+0x80,
-    'p','o','w'+0x80,
-    0
-};
-enum {
-    FN2_atan2=0,
-    FN2_hypot,
-    FN2_pow,
-    FN2_UNKNOWN,
 };
 
 float expr8(void);
@@ -125,112 +119,123 @@ int scantable(unsigned char *table)
 }
 
 /***************************************************************************/
-float singleFunc(int tidx)
+int getVariableIndex(void)
 {
-    float a;
-
-    if(*txtpos != '(') {
-        return NAN;
+    if(*txtpos >= 'A' && *txtpos < ('A' + TEA_VARS_COUNT)) {
+        return (*txtpos++ - 'A');
     }
-
-    txtpos++;
-    a = expr8();
-    if(*txtpos != ')') {
-        return NAN;
-    }
-    txtpos++;
-    switch(tidx) {
-        case FN_abs:
-            a = fabsf(a);
-            break;
-        case FN_acos:
-            a = acosf(a);
-            break;
-        case FN_asin:
-            a = asinf(a);
-            break;
-        case FN_atan:
-            a = atanf(a);
-            break;
-        case FN_ceil:
-            a = ceilf(a);
-            break;
-        case FN_cos:
-            a = cosf(a);
-            break;
-        case FN_cosh:
-            a = coshf(a);
-            break;
-        case FN_exp:
-            a = expf(a);
-            break;
-        case FN_floor:
-            a = floorf(a);
-            break;
-        case FN_log:
-            a = logf(a);
-            break;
-        case FN_log10:
-            a = log10f(a);
-            break;
-        case FN_round:
-            a = roundf(a);
-            break;
-        case FN_sin:
-            a = sinf(a);
-            break;
-        case FN_sinh:
-            a = sinhf(a);
-            break;
-        case FN_sqrt:
-            a = sqrtf(a);
-            break;
-        case FN_tan:
-            a = tanf(a);
-            break;
-        case FN_tanh:
-            a = tanhf(a);
-            break;
-        default:
-            a = NAN;
-            break;
-    }
-    return a;
+    return -1; // Not a variable
 }
 
 /***************************************************************************/
-float doubleFunc(int tidx)
+float doFunction(int fidx)
 {
     float a,b;
-
     if(*txtpos != '(') {
         return NAN;
     }
     txtpos++;
-    a = expr8();
-    if(*txtpos != ',') {
-        return NAN;
-    }
-    txtpos++;
-    b = expr8();
-    if(*txtpos != ')') {
-        return NAN;
-    }
-    txtpos++;
-    switch(tidx) {
-        case FN2_atan2:
+
+    switch(fidx) {
+        case FN_abs:
+            a = expr8();
+            a = fabsf(a);
+            break;
+        case FN_acos:
+            a = expr8();
+            a = acosf(a);
+            break;
+        case FN_asin:
+            a = expr8();
+            a = asinf(a);
+            break;
+        case FN_atan:
+            a = expr8();
+            a = atanf(a);
+            break;
+        case FN_ceil:
+            a = expr8();
+            a = ceilf(a);
+            break;
+        case FN_cos:
+            a = expr8();
+            a = cosf(a);
+            break;
+        case FN_cosh:
+            a = expr8();
+            a = coshf(a);
+            break;
+        case FN_exp:
+            a = expr8();
+            a = expf(a);
+            break;
+        case FN_floor:
+            a = expr8();
+            a = floorf(a);
+            break;
+        case FN_log:
+            a = expr8();
+            a = logf(a);
+            break;
+        case FN_log10:
+            a = expr8();
+            a = log10f(a);
+            break;
+        case FN_round:
+            a = expr8();
+            a = roundf(a);
+            break;
+        case FN_sin:
+            a = expr8();
+            a = sinf(a);
+            break;
+        case FN_sinh:
+            a = expr8();
+            a = sinhf(a);
+            break;
+        case FN_sqrt:
+            a = expr8();
+            a = sqrtf(a);
+            break;
+        case FN_tan:
+            a = expr8();
+            a = tanf(a);
+            break;
+        case FN_tanh:
+            a = expr8();
+            a = tanhf(a);
+            break;
+
+        case FN_atan2:
+            a = expr8();
+            if(*txtpos != ',') return NAN;
+            txtpos++;
+            b = expr8();
             a = atan2f(a, b);
             break;
-        case FN2_hypot:
+        case FN_hypot:
+            a = expr8();
+            if(*txtpos != ',') return NAN;
+            txtpos++;
+            b = expr8();
             a = hypotf(a, b);
             break;
-        case FN2_pow:
+        case FN_pow:
+            a = expr8();
+            if(*txtpos != ',') return NAN;
+            txtpos++;
+            b = expr8();
             a = powf(a, b);
             break;
+
         default:
             a = NAN;
             break;
     }
+    if(*txtpos != ')') {
+        return NAN;
+    }
+    txtpos++;
     return a;
 }
 
@@ -267,15 +272,10 @@ float expr1(void)
     // Functions are multiple lowercase alphas.
 	if(*txtpos >= 'a' && *txtpos <= 'z')
 	{
-		// Is it a function with a single parameter?
+		// Is it a function?
 		int tidx = scantable(func_tab);
 		if(tidx != FN_UNKNOWN) {
-            return singleFunc(tidx);
-        }
-        // two parameters?
-        tidx = scantable(func2_tab);
-        if(tidx != FN2_UNKNOWN) {
-            return doubleFunc(tidx);
+            return doFunction(tidx);
         }
         return NAN;
 	}
