@@ -63,7 +63,26 @@ int main(int argc, char **argv)
     assert(1.0f == tea_calc("10 != 5", NULL));
     assert(0.0f == tea_calc("5 != 5", NULL));
 
-    // TODO: Add tests for && ||
+    assert(1.0f == tea_calc("1 && 1", NULL));
+    assert(0.0f == tea_calc("1 && 0", NULL));
+    assert(0.0f == tea_calc("0 && 1", NULL));
+    assert(0.0f == tea_calc("0 && 0", NULL));
+
+    assert(1.0f == tea_calc("1 || 1", NULL));
+    assert(1.0f == tea_calc("1 || 0", NULL));
+    assert(1.0f == tea_calc("0 || 1", NULL));
+    assert(0.0f == tea_calc("0 || 0", NULL));
+
+    assert(1.0f == tea_calc("5 && 7", NULL));
+    assert(0.0f == tea_calc("5 && 0", NULL));
+    assert(0.0f == tea_calc("0 && 7", NULL));
+    assert(0.0f == tea_calc("0 && 0", NULL));
+
+    assert(1.0f == tea_calc("2 || 8", NULL));
+    assert(1.0f == tea_calc("2 || 0", NULL));
+    assert(1.0f == tea_calc("0 || 8", NULL));
+    assert(0.0f == tea_calc("0 || 0", NULL));
+
     // TODO: Add tests for assignment
 
     assert(21.0f == tea_calc("7 * 4 - 7", NULL));
