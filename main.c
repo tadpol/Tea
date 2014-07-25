@@ -86,9 +86,9 @@ int main(int argc, char **argv)
     assert(36.0f == tea_calc("10 == 5; -42; 9*4", NULL));
     puts(" Passed semi-colon test");
 
-    // TODO: Add tests for assignment
     assert(6.0f == tea_calc("A = 6", NULL));
     assert(96.0f == tea_calc("A = 6 + 10 * 9", NULL));
+    assert(16.0f == tea_calc("A=6; B=10; A+B", NULL));
     puts(" Passed assignment tests");
 
     assert(21.0f == tea_calc("7 * 4 - 7", NULL));
