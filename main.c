@@ -83,6 +83,9 @@ int main(int argc, char **argv)
     puts(" Passed && and || tests");
 
     // TODO: Add tests for assignment
+    assert(6.0f == tea_calc("A = 6", NULL));
+    assert(96.0f == tea_calc("A = 6 + 10 * 9", NULL));
+    puts(" Passed assignment tests");
 
     assert(21.0f == tea_calc("7 * 4 - 7", NULL));
     assert(27.0f == tea_calc("45 - 6 * 3", NULL));
