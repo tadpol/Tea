@@ -18,6 +18,28 @@
 #define pgm_read_byte(x) *(x)
 #else /*AVR*/
 #include <avr/pgmspace.h>
+#define fabsf fabs
+#define acosf acos
+#define asinf asin
+#define atanf atan
+#define ceilf ceil
+#define cosf cos
+#define coshf cosh
+#define expf exp
+#define floorf floor
+#define logf log
+#define log10f log10
+#define fmodf fmod
+#define roundf round
+#define sinf sin
+#define sinhf sinh
+#define sqrtf sqrt
+#define tanf tan
+#define tanhf tanh
+#define atan2f atan2
+#define hypotf hypot
+#define powf pow
+#define strtof strtod
 #endif /*AVR*/
 
 static char *txtpos; // initialize with command buffer.

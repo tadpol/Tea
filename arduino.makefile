@@ -1,4 +1,4 @@
-ARDMK_DIR     = ~/Documents/Arduino/Arduino-Makefile-master 
+ARDMK_DIR     = ~/Documents/Arduino/Arduino-Makefile-master
 MONITOR_PORT  = /dev/tty.usbmodem*
 BOARD_TAG     = uno
 
