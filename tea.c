@@ -109,39 +109,39 @@ void ignore_blanks(void)
 /***************************************************************************/
 int scantable(unsigned char *table)
 {
-	int i = 0;
-	int table_index = 0;
-	while(1)
-	{
-		// Run out of table entries?
-		if(pgm_read_byte(table) == 0) {
+    int i = 0;
+    int table_index = 0;
+    while(1)
+    {
+        // Run out of table entries?
+        if(pgm_read_byte(table) == 0) {
             return table_index;
         }
 
-		// Do we match this character?
-		if(txtpos[i] == pgm_read_byte(table)) {
-			i++;
-			table++;
-		} else {
-			// do we match the last character of keyword (with 0x80 added)? If so, return
-			if(txtpos[i]+0x80 == pgm_read_byte(table)) {
-				txtpos += i+1;  // Advance the pointer to following the keyword
+        // Do we match this character?
+        if(txtpos[i] == pgm_read_byte(table)) {
+            i++;
+            table++;
+        } else {
+            // do we match the last character of keyword (with 0x80 added)? If so, return
+            if(txtpos[i]+0x80 == pgm_read_byte(table)) {
+                txtpos += i+1;  // Advance the pointer to following the keyword
                 ignore_blanks();
-				return table_index;
-			}
-
-			// Forward to the end of this keyword
-			while((pgm_read_byte(table) & 0x80) == 0) {
-				table++;
+                return table_index;
             }
 
-			// Now move on to the first character of the next word, and reset the position index
-			table++;
-			table_index++;
+            // Forward to the end of this keyword
+            while((pgm_read_byte(table) & 0x80) == 0) {
+                table++;
+            }
+
+            // Now move on to the first character of the next word, and reset the position index
+            table++;
+            table_index++;
             ignore_blanks();
-			i = 0;
-		}
-	}
+            i = 0;
+        }
+    }
 }
 
 /***************************************************************************/
@@ -308,7 +308,7 @@ float expr1(void)
     float a;
     ignore_blanks();
 
-	if(*txtpos == '-') {
+    if(*txtpos == '-') {
         txtpos++;
         return -expr1();
     }
@@ -333,26 +333,26 @@ float expr1(void)
     }
 
     // Functions are multiple lowercase alphas.
-	if(*txtpos >= 'a' && *txtpos <= 'z')
-	{
-		// Is it a function?
-		int tidx = scantable(func_tab);
-		if(tidx != FN_UNKNOWN) {
+    if(*txtpos >= 'a' && *txtpos <= 'z')
+    {
+        // Is it a function?
+        int tidx = scantable(func_tab);
+        if(tidx != FN_UNKNOWN) {
             return doFunction(tidx);
         }
         return NAN;
-	}
+    }
 
-	if(*txtpos == '(') {
-		txtpos++;
-		a = expr8();
-		if(*txtpos != ')') {
+    if(*txtpos == '(') {
+        txtpos++;
+        a = expr8();
+        if(*txtpos != ')') {
             return NAN;
         }
 
-		txtpos++;
-		return a;
-	}
+        txtpos++;
+        return a;
+    }
 
     return NAN;
 }
@@ -360,76 +360,76 @@ float expr1(void)
 /***************************************************************************/
 float expr2(void)
 {
-	float a,b;
+    float a,b;
 
-	a = expr1();
+    a = expr1();
     ignore_blanks();
-	while(1) {
-		if(*txtpos == '^') {
-			txtpos++;
-			b = expr1();
+    while(1) {
+        if(*txtpos == '^') {
+            txtpos++;
+            b = expr1();
             a = powf(a, b);
-		} else {
-			return a;
+        } else {
+            return a;
         }
-	}
+    }
 }
 
 /***************************************************************************/
 float expr3(void)
 {
-	float a,b;
+    float a,b;
 
-	a = expr2();
+    a = expr2();
     ignore_blanks();
-	while(1) {
-		if(*txtpos == '*') {
-			txtpos++;
-			b = expr2();
-			a *= b;
-		} else if(*txtpos == '/') {
-			txtpos++;
-			b = expr2();
-			if(b != 0) {
-				a /= b;
+    while(1) {
+        if(*txtpos == '*') {
+            txtpos++;
+            b = expr2();
+            a *= b;
+        } else if(*txtpos == '/') {
+            txtpos++;
+            b = expr2();
+            if(b != 0) {
+                a /= b;
             } else {
-				a = NAN;
+                a = NAN;
             }
         } else if(*txtpos == '%') {
             txtpos++;
-			b = expr2();
+            b = expr2();
             a = fmodf(a,b);
-		} else {
-			return a;
+        } else {
+            return a;
         }
-	}
+    }
 }
 
 /***************************************************************************/
 float expr4(void)
 {
-	float a,b;
+    float a,b;
 
-	if(*txtpos == '-' || *txtpos == '+') {
-		a = 0;
+    if(*txtpos == '-' || *txtpos == '+') {
+        a = 0;
     } else {
-		a = expr3();
+        a = expr3();
         ignore_blanks();
     }
 
-	while(1) {
-		if(*txtpos == '-') {
-			txtpos++;
-			b = expr3();
-			a -= b;
-		} else if(*txtpos == '+') {
-			txtpos++;
-			b = expr3();
-			a += b;
-		} else {
-			return a;
+    while(1) {
+        if(*txtpos == '-') {
+            txtpos++;
+            b = expr3();
+            a -= b;
+        } else if(*txtpos == '+') {
+            txtpos++;
+            b = expr3();
+            a += b;
+        } else {
+            return a;
         }
-	}
+    }
 }
 
 /***************************************************************************/
@@ -437,21 +437,21 @@ float expr5(void)
 {
     float a,b;
 
-	a = expr4();
+    a = expr4();
     ignore_blanks();
-	while(1) {
-		if(txtpos[0] == '&' && txtpos[1] == '&') {
-			txtpos+=2;
+    while(1) {
+        if(txtpos[0] == '&' && txtpos[1] == '&') {
+            txtpos+=2;
             b = expr4();
-			a = (a && b);
-		} else if(txtpos[0] == '|' && txtpos[1] == '|') {
-			txtpos+=2;
+            a = (a && b);
+        } else if(txtpos[0] == '|' && txtpos[1] == '|') {
+            txtpos+=2;
             b = expr4();
             a = (a || b);
-		} else {
-			return a;
+        } else {
+            return a;
         }
-	}
+    }
 }
 
 /***************************************************************************/
@@ -459,37 +459,37 @@ float expr6(void)
 {
     float a,b;
 
-	a = expr5();
+    a = expr5();
     ignore_blanks();
-	while(1) {
-		if(txtpos[0] == '<' && txtpos[1] == '=') {
-			txtpos+=2;
+    while(1) {
+        if(txtpos[0] == '<' && txtpos[1] == '=') {
+            txtpos+=2;
             b = expr5();
             a = (a <= b);
-		} else if(txtpos[0] == '>' && txtpos[1] == '=') {
-			txtpos+=2;
+        } else if(txtpos[0] == '>' && txtpos[1] == '=') {
+            txtpos+=2;
             b = expr5();
             a = (a >= b);
-		} else if(txtpos[0] == '!' && txtpos[1] == '=') {
-			txtpos+=2;
+        } else if(txtpos[0] == '!' && txtpos[1] == '=') {
+            txtpos+=2;
             b = expr5();
             a = (a != b);
-		} else if(txtpos[0] == '=' && txtpos[1] == '=') {
-			txtpos++;
+        } else if(txtpos[0] == '=' && txtpos[1] == '=') {
+            txtpos++;
             b = expr5();
             a = (a == b);
-		} else if(txtpos[0] == '<') {
-			txtpos++;
+        } else if(txtpos[0] == '<') {
+            txtpos++;
             b = expr5();
             a = (a < b);
-		} else if(txtpos[0] == '>') {
-			txtpos++;
+        } else if(txtpos[0] == '>') {
+            txtpos++;
             b = expr5();
             a = (a > b);
-		} else {
-			return a;
+        } else {
+            return a;
         }
-	}
+    }
 }
 
 /***************************************************************************/
