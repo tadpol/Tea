@@ -82,6 +82,10 @@ int main(int argc, char **argv)
     assert(0.0f == tea_calc("0 || 0", NULL));
     puts(" Passed && and || tests");
 
+    assert(10.0f == tea_calc("1; 2; 3; 4; 5; 6; 7; 8; 9; 10", NULL));
+    assert(36.0f == tea_calc("10 == 5; -42; 9*4", NULL));
+    puts(" Passed semi-colon test");
+
     // TODO: Add tests for assignment
     assert(6.0f == tea_calc("A = 6", NULL));
     assert(96.0f == tea_calc("A = 6 + 10 * 9", NULL));
