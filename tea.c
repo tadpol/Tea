@@ -475,7 +475,7 @@ float expr6(void)
             b = expr5();
             a = (a != b);
         } else if(txtpos[0] == '=' && txtpos[1] == '=') {
-            txtpos++;
+            txtpos+=2;
             b = expr5();
             a = (a == b);
         } else if(txtpos[0] == '<') {
